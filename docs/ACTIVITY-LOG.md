@@ -4,6 +4,28 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — CI workflow
+
+**Done:** `.github/workflows/ci.yml` — typecheck + build on every push to `main` and
+every PR. Node 22, `npm ci` + cached install. Runs the exact commands verified locally
+(`npm run typecheck`, `npm run build`), both green.
+
+Lint and unit test steps deliberately left out rather than stubbed: `npm run lint` is
+currently broken (P2.1, no ESLint installed) and there's no test runner yet (P2.9).
+Adding either as a no-op step would just mean removing it again later — better to add
+each step when it has something real to check.
+
+`APP_URL` repo variable set to `https://sync-mind-three.vercel.app` (Settings → Actions
+→ Variables), and `keepalive.yml` triggered manually to confirm end to end: ping step
+hit the real health endpoint, heartbeat commit landed on `main`. P0.2/P0.3/P0.4 are now
+all fully live, not just merged.
+
+**Next:** P2.1 (ESLint) or P2.7 (README still says "no application code exists yet") —
+both small, both unblock things (2.1 unblocks CI's lint step; 2.7 is the first thing
+anyone sees on the repo).
+
+---
+
 ## 2026-07-28 — ffmpeg threading locked + APP_URL wired to the live deploy
 
 **Discovered mid-session:** Vercel was already connected, live at

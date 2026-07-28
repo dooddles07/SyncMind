@@ -15,7 +15,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | 0.6 | Generate `lib/supabase/types.ts`; build browser/server/admin clients |
 | 0.7 | `.env.example` complete; `.gitignore`; local `.env.local` verified |
 | 0.8 | Vercel project connected, preview deploys on PR |
-| 0.9 | `ci.yml` — typecheck, lint, unit (not built). `keepalive.yml` — **done**: every 3 days, pings `/api/health` and self-commits a heartbeat so GitHub never auto-disables it from 60 days of repo inactivity, independent of deploy state. See `docs/GAP-ANALYSIS.md` P0.2. |
+| 0.9 | `ci.yml` — **done**: typecheck + build on every push and PR. Lint and unit steps wait on P2.1 (ESLint not installed) and Vitest (not configured). `keepalive.yml` — **done**: every 3 days, pings `/api/health` and self-commits a heartbeat so GitHub never auto-disables it from 60 days of repo inactivity, independent of deploy state. See `docs/GAP-ANALYSIS.md` P0.2. |
 | 0.10 | Vitest and Playwright configured with one passing test each |
 | 0.11 | Check `console.groq.com` → Settings → Limits for both models; set real `GROQ_DAILY_*` values in `lib/quota.ts` defaults and log the confirmed numbers in ACTIVITY-LOG (see AI-PIPELINE §7) |
 

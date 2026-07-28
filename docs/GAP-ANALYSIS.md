@@ -16,7 +16,7 @@ Verified by reading: 68 tracked files, `npm run build` (passes), `npm run typech
 | Auth | Does not exist. No `middleware.ts`, no session, no route protection. |
 | AI | Does not exist. No Groq/Gemini client, no `lib/quota.ts`, no prompts. |
 | Integrations | Resolved — no OAuth needed. `lib/export/gmail.ts` + `lib/export/ics.ts`. |
-| CI / cron | Keepalive done (`.github/workflows/keepalive.yml`, `app/api/health`). `ci.yml` and `sweep.yml` still missing. |
+| CI / cron | `ci.yml` and `keepalive.yml` done. `sweep.yml` still missing (needs P1). |
 | Tests | Do not exist. No runner installed. |
 | Deploy | Repo pushed to `github.com/dooddles07/SyncMind`. **Vercel connected and live** at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/) — confirmed via `/api/health`. |
 
@@ -114,8 +114,8 @@ Ordered as a build sequence; each item is a real dependency of the next.
 | # | Gap | Fix |
 | --- | --- | --- |
 | 2.1 | `npm run lint` is broken — script says `next lint`, no ESLint installed, no config | Install `eslint` + `eslint-config-next` and add `eslint.config.mjs`. Note `next lint` is deprecated in Next 15 and gone in 16; move to the ESLint CLI directly. |
-| 2.2 | No CI | `.github/workflows/ci.yml`: typecheck, lint, build. Free and unlimited on a public repo. |
-| 2.3 | No `keepalive.yml` / `sweep.yml` | See P0.2/P0.3. Without these the live demo dies quietly. |
+| 2.2 | ~~No CI~~ **Resolved** | `.github/workflows/ci.yml`: typecheck + build on every push/PR. Lint step waits on 2.1 (ESLint not installed yet); unit step waits on 2.9 (no test runner). |
+| 2.3 | `keepalive.yml` **done** / `sweep.yml` still missing | See P0.2/P0.3. `sweep.yml` needs the pipeline state machine (P1/M2), not built yet. |
 | 2.4 | No error/not-found UI | Missing `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`, `app/loading.tsx`. A thrown error today shows the raw Next.js default. |
 | 2.5 | No OG image, no `robots.ts`, no `sitemap.ts`, no `manifest.ts` | For a portfolio link this is the highest-visibility gap on the list. Pasting the URL into LinkedIn/X/Discord currently previews as a bare title. `opengraph-image.tsx` with `next/og` is free and static. |
 | 2.6 | No Vercel project connected | No `.vercel` directory. Nothing is deployed, so there is no link to put on the portfolio. |
@@ -160,7 +160,7 @@ Nothing in the recommended stack requires a payment method at any step.
 
 1. ~~P0 decisions~~ **Done** — P0.1 (OAuth drop), P0.2 (keepalive heartbeat), P0.4 (ffmpeg threading locked) shipped 2026-07-28. Only P0.5 (verify real Groq limits — needs your Groq console) remains, and it's not blocking anything else.
 2. ~~P2.6 connect Vercel~~ **Already done**, discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/).
-3. P2.7 + P2.1 + P2.2 — fix the remaining stale README claims, add ESLint, add `ci.yml`. Small, fully actionable now.
+3. ~~P2.2~~ **Done** — `ci.yml` shipped. P2.7 + P2.1 — fix the remaining stale README claims, add ESLint (then wire it into `ci.yml`'s lint step). Small, fully actionable now.
 4. P2.5 OG image + error pages — the demo now looks finished when shared, and it already has a real URL to share.
 5. P1.1 → P1.13 in order — the real build, M1 through M3.
 6. P3.
