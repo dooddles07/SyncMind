@@ -1,11 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="7" fill="#0B1412" />
-  <!-- same geometry as components/brand.tsx, inset to sit inside the rounded square -->
-  <g transform="translate(3.4 3.4) scale(0.7875)" stroke-width="3.6" stroke-linecap="round">
-    <path d="M6.6 5V20.5" stroke="#F5A93F" />
-    <path d="M11.9 9V20.5" stroke="#F5A93F" />
-    <path d="M17.2 13V20.5" stroke="#F5A93F" />
-    <path d="M22.5 16.5v6.4a3.6 3.6 0 0 1-3.6 3.6" stroke="#3FC9BC" />
-    <path d="M4.7 26.5h22.6" stroke="#3FC9BC" />
+  <!--
+    Same geometry as components/brand.tsx. Transparent background, so the colours are
+    mid-tones that hold against both light and dark browser chrome rather than the
+    per-theme token values.
+  -->
+  <g stroke-width="3" stroke-linecap="round">
+    <path d="M6.6 5V20.5" stroke="#E8901F" />
+    <path d="M11.9 9V20.5" stroke="#E8901F" />
+    <path d="M17.2 13V20.5" stroke="#E8901F" />
+    <path d="M22.5 16.5v6.4a3.6 3.6 0 0 1-3.6 3.6" stroke="#17A79A" />
+    <path d="M4.7 26.5h22.6" stroke="#17A79A" />
   </g>
 </svg>
