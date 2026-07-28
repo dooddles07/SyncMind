@@ -28,7 +28,22 @@ Verified: `tsc --noEmit` clean, `next build` clean, and all **44 token assertion
 
 Note for whoever verifies next: Chrome preserves `oklch()` in `getComputedStyle`, it does not convert to `rgb()`. Comparing the computed string to a hex will produce 44 false failures. Rasterise the resolved colour to a 1×1 canvas and read the pixel instead. There is a working assertion script pattern in the session history.
 
-**Phase 2 — components: not started.**
+**Phase 2 — components: PARTIAL.**
+
+Built and verified: `lib/types.ts` (all enums from DATA-MODEL, plus `isOverdue`, `formatTimestamp`, `formatDuration`) · `components/ui/button.tsx` (5 variants × 3 sizes, loading, disabled, icon) · `components/ui/badge.tsx` (6 variants, optional dot) · `components/ui/card.tsx` · `components/ui/skeleton.tsx` · `components/ui/empty-state.tsx` · `components/meeting/status-stepper.tsx` (all 7 `MeetingStatus` values) · `app/gallery/page.tsx`.
+
+`@radix-ui/react-slot` added for Button's `asChild`.
+
+Verified: `tsc --noEmit` clean, `next build` clean (4 static routes), gallery renders every section and all 7 stepper states with their status words.
+
+**Bug found and fixed during verification:** `ThemeToggle` gated its icon on `mounted` but not its `aria-label`, so the server rendered "Switch to dark mode" and the client replaced it on hydration. That is both a React hydration error and a screen reader announcing the wrong action. Anything derived from `resolvedTheme` must stay stable until after mount — icon *and* label. Server now emits a neutral "Toggle theme".
+
+**Still to build in Phase 2 — 14 primitives:** Input · Textarea · Select · Checkbox · Switch · Dialog · Sheet · DropdownMenu · Tabs · Tooltip · Avatar · Separator · Progress · Toast (sonner) · AlertDialog · Command.
+
+**Still to build — 12 product components:** Dropzone · ChunkProgress · AudioPlayer · TranscriptList · SpeakerChip · MinutesEditor · ActionTable · EmailComposer · AskPanel · KanbanBoard · QuotaBanner.
+
+Extend `app/gallery/page.tsx` as each lands. Behaviour specs for all of them are in the Phase 2 table below.
+
 **Phase 3 — screens: not started.**
 
 Delete `app/foundations/page.tsx` once Phase 3 lands.
