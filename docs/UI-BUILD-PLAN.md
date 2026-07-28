@@ -16,6 +16,25 @@ Source of truth for visuals: the Figma file `hgVbn1fdh7xkw9gkg64HF2` and `docs/D
 
 ---
 
+## Progress
+
+**Phase 1 — foundation: DONE and verified 2026-07-28.**
+
+Scaffolded manually rather than with `create-next-app`, because the repo already had `README.md`, `LICENSE`, `.gitignore`, `.env.example` and `docs/` that the generator would have clobbered.
+
+Files in place: `package.json` · `tsconfig.json` · `next.config.ts` · `postcss.config.mjs` · `app/globals.css` · `app/fonts.ts` · `app/layout.tsx` · `app/page.tsx` (placeholder) · `app/foundations/page.tsx` (token proof) · `components/theme-provider.tsx` · `components/theme-toggle.tsx` · `lib/utils.ts` · `.claude/launch.json`.
+
+Verified: `tsc --noEmit` clean, `next build` clean, and all **44 token assertions pass** — 22 tokens × 2 modes, compared as rendered sRGB against the values in this plan.
+
+Note for whoever verifies next: Chrome preserves `oklch()` in `getComputedStyle`, it does not convert to `rgb()`. Comparing the computed string to a hex will produce 44 false failures. Rasterise the resolved colour to a 1×1 canvas and read the pixel instead. There is a working assertion script pattern in the session history.
+
+**Phase 2 — components: not started.**
+**Phase 3 — screens: not started.**
+
+Delete `app/foundations/page.tsx` once Phase 3 lands.
+
+---
+
 ## Stack
 
 - Next.js 15, App Router, TypeScript, React 19

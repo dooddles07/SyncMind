@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+/* next-themes uses a class on <html>, so dark has to be a class variant not a media query */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  Token values are the OKLCH source from docs/DESIGN-SYSTEM.md section 2, verified
+  against the Figma file. The five *-text tokens and input-strong are derived: the
+  documented semantic colours fail WCAG AA as text in light mode. See
+  docs/UI-BUILD-PLAN.md "Corrections" before changing any of these.
+*/
+:root {
+  --background: oklch(0.99 0.002 250);
+  --foreground: oklch(0.21 0.01 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.01 255);
+  --muted: oklch(0.965 0.004 250);
+  --muted-foreground: oklch(0.52 0.012 255);
+  --border: oklch(0.92 0.005 250);
+  --input: oklch(0.92 0.005 250);
+
+  --primary: oklch(0.52 0.11 195);
+  --primary-foreground: oklch(0.99 0.002 250);
+  --accent: oklch(0.95 0.02 195);
+  --accent-foreground: oklch(0.36 0.09 195);
+  --ring: oklch(0.52 0.11 195);
+
+  --success: oklch(0.6 0.13 155);
+  --warning: oklch(0.72 0.14 75);
+  --destructive: oklch(0.58 0.19 27);
+  --info: oklch(0.58 0.12 250);
+
+  /* derived, AA only. text and control borders. never as a surface fill */
+  --success-text: oklch(0.525 0.13 155);
+  --warning-text: oklch(0.545 0.14 75);
+  --destructive-text: oklch(0.565 0.19 27);
+  --info-text: oklch(0.54 0.12 250);
+  --input-strong: oklch(0.64 0.005 250);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* light mode only. dark raises the border instead, shadows do not read on dark surfaces */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.05);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.07);
+  --shadow-lg: 0 12px 32px oklch(0 0 0 / 0.1);
+}
+
+.dark {
+  --background: oklch(0.17 0.008 255);
+  --foreground: oklch(0.95 0.004 250);
+  --card: oklch(0.21 0.009 255);
+  --card-foreground: oklch(0.95 0.004 250);
+  --muted: oklch(0.25 0.009 255);
+  --muted-foreground: oklch(0.67 0.012 255);
+  --border: oklch(0.29 0.01 255);
+  --input: oklch(0.29 0.01 255);
+
+  --primary: oklch(0.72 0.11 195);
+  --primary-foreground: oklch(0.17 0.008 255);
+  --accent: oklch(0.28 0.04 195);
+  --accent-foreground: oklch(0.85 0.08 195);
+  --ring: oklch(0.72 0.11 195);
+
+  --success: oklch(0.7 0.13 155);
+  --warning: oklch(0.79 0.14 75);
+  --destructive: oklch(0.65 0.18 27);
+  --info: oklch(0.68 0.12 250);
+
+  /* dark already clears AA, so these mirror their base */
+  --success-text: oklch(0.7 0.13 155);
+  --warning-text: oklch(0.79 0.14 75);
+  --destructive-text: oklch(0.65 0.18 27);
+  --info-text: oklch(0.68 0.12 250);
+  --input-strong: oklch(0.53 0.01 255);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-strong: var(--input-strong);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-info: var(--info);
+
+  --color-success-text: var(--success-text);
+  --color-warning-text: var(--warning-text);
+  --color-destructive-text: var(--destructive-text);
+  --color-info-text: var(--info-text);
+
+  --font-display: var(--font-inter-tight);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* the ring is never removed, only made visible on keyboard focus */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* timestamps and data columns must not jitter as digits change */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* the transcript is the most-read surface in the product */
+  .measure-transcript {
+    max-width: 68ch;
+  }
+}
+
+/*
+  State is never conveyed by motion alone: under reduced motion the processing
+  pulse becomes a static filled dot and the stepper still swaps its icon.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
