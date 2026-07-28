@@ -15,8 +15,8 @@ Verified by reading: 68 tracked files, `npm run build` (passes), `npm run typech
 | Backend | Does not exist. No `app/api/**`, no `lib/supabase/**`, no `supabase/migrations/**`. |
 | Auth | Does not exist. No `middleware.ts`, no session, no route protection. |
 | AI | Does not exist. No Groq/Gemini client, no `lib/quota.ts`, no prompts. |
-| Integrations | Do not exist. No Google OAuth, Gmail, or Calendar code. |
-| CI / cron | Do not exist. No `.github/`. |
+| Integrations | Resolved — no OAuth needed. `lib/export/gmail.ts` + `lib/export/ics.ts`. |
+| CI / cron | Keepalive done (`.github/workflows/keepalive.yml`, `app/api/health`). `ci.yml` and `sweep.yml` still missing. |
 | Tests | Do not exist. No runner installed. |
 | Deploy | Repo pushed to `github.com/dooddles07/SyncMind`. No `.vercel`, so likely not connected yet. |
 
@@ -28,7 +28,9 @@ Roughly: M0 partially done, M1 UI-only, M2-M5 not started.
 
 These invalidate parts of the documented plan. Each has a $0 answer, but the plan has to change.
 
-### P0.1 — Google OAuth Testing mode expires refresh tokens every 7 days
+### P0.1 — Google OAuth Testing mode expires refresh tokens every 7 days — **Resolved**
+
+`lib/export/gmail.ts` + `lib/export/ics.ts` replace `gmail.compose`/`calendar.events`. See `docs/ACTIVITY-LOG.md` 2026-07-28.
 
 `docs/ROADMAP.md` M4 and `DEPLOYMENT.md` §1 accept "Testing mode, 100 users" as fine for MVP. It is not fine for the token model. With an External consent screen in **Testing** publishing status, Google expires refresh tokens after **7 days**. Every user (including you, the portfolio owner) must re-consent weekly or Gmail drafts and Calendar inserts start failing with `invalid_grant`.
 
@@ -45,7 +47,9 @@ Escaping Testing mode is not free either: `gmail.compose` is a **restricted** sc
 
 **If you insist on real Gmail drafts:** accept and surface the 7-day reconnect in the UI, and add a "Reconnect Google" state to Settings driven by a stored `refresh_token_issued_at`.
 
-### P0.2 — GitHub Actions cron dies after 60 days of repo inactivity
+### P0.2 — GitHub Actions cron dies after 60 days of repo inactivity — **Resolved**
+
+`.github/workflows/keepalive.yml` + `app/api/health/route.ts`. Self-commits a heartbeat every 3 days regardless of deploy state, so the 60-day clock never reaches zero. `docs/DEPLOYMENT.md` §8 documents the cron-job.org redundant pinger as a one-time manual step once Vercel is connected. See `docs/ACTIVITY-LOG.md` 2026-07-28.
 
 M0.9 keepalive and M2.11 sweep both rely on `schedule:` workflows. GitHub **disables scheduled workflows after 60 days without repository activity**, and emails the owner. On a finished portfolio project you will not push for 60 days. Then keepalive stops, then Supabase pauses (P0.3), then the live demo 500s for anyone who clicks your portfolio link.
 
@@ -55,7 +59,7 @@ M0.9 keepalive and M2.11 sweep both rely on `schedule:` workflows. GitHub **disa
 
 ### P0.3 — Supabase free project pauses after 7 idle days
 
-Already in `ARCHITECTURE.md` §1, but the consequence for a *portfolio* is sharper than for a product: a paused project means a recruiter clicking your link gets a broken app, and restore is a manual dashboard click. Depends entirely on P0.2 being reliable.
+Already in `ARCHITECTURE.md` §1, but the consequence for a *portfolio* is sharper than for a product: a paused project means a recruiter clicking your link gets a broken app, and restore is a manual dashboard click. P0.2's mechanism is in place; still blocked on Supabase not existing yet (P1) and Vercel not being connected (P2.6) — `APP_URL` repo variable is unset until then, so the health ping currently no-ops.
 
 Also confirm at signup time: free tier caps you at 2 active projects, so do not burn one on a throwaway.
 

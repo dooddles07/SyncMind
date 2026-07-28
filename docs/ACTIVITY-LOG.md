@@ -4,6 +4,37 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — Keepalive workflow (fixes GitHub's 60-day scheduled-workflow auto-disable)
+
+**Done:** P0.2 from `docs/GAP-ANALYSIS.md`. GitHub disables `schedule:` workflows after
+60 days with no repository *push* activity — a scheduled run doesn't count, only a
+`git push` does. A finished portfolio project sees no pushes for 60+ days, so any
+naive keepalive/sweep cron eventually goes silently dark, Supabase pauses next (7 idle
+days), and the live link 500s for anyone who clicks it.
+
+Added:
+- `app/api/health/route.ts` — trivial health check, no secrets, no DB call yet (there
+  is no DB). Returns status/timestamp/commit SHA. Extension point for P1: add a
+  `select 1` once Supabase exists.
+- `.github/workflows/keepalive.yml` — runs every 3 days. Pings `/api/health` via a
+  repo variable `APP_URL` (no-ops with a log line if unset — not deployed yet). Then
+  writes a timestamp to `.github/heartbeat` and commits + pushes it. **That commit is
+  the actual fix** — it resets GitHub's 60-day clock regardless of deploy state, so it
+  works today and keeps working forever untouched.
+- `docs/DEPLOYMENT.md` §8 — documents setting `APP_URL` once Vercel is connected, plus
+  a redundant cron-job.org pinger as a one-time manual step (independent failure
+  domain from GitHub Actions).
+
+**Still open:** `APP_URL` is unset until Vercel is connected (P2.6). `ci.yml` and
+`sweep.yml` remain unbuilt — sweep needs the pipeline state machine (P1/M2), which
+doesn't exist yet.
+
+**Next:** P0.3 is now mechanically covered by the same workflow once `APP_URL` is set;
+remaining P0 items are P0.4 (`ffmpeg.wasm` threading decision) and P0.5 (verify real
+Groq limits).
+
+---
+
 ## 2026-07-28 — Gap analysis + M4 rebuilt without Google APIs
 
 **Done:** Full-repo gap scan (`docs/GAP-ANALYSIS.md`, new file) against the stated goal

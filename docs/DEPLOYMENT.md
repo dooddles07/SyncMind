@@ -149,11 +149,15 @@ Do not use Vercel Cron — Hobby allows only daily jobs and we need the keep-ali
 
 ## 8. Scheduled jobs
 
-`.github/workflows/keepalive.yml` — every 3 days, `curl` `${{ secrets.APP_URL }}/api/health`. This is what stops Supabase pausing the project.
+`.github/workflows/keepalive.yml` — every 3 days, `curl`s `${{ vars.APP_URL }}/api/health` (a repo **variable**, not a secret — it's just the public URL) if that variable is set, then writes a timestamp to `.github/heartbeat` and commits + pushes it.
 
-`.github/workflows/sweep.yml` — daily at 03:00 UTC, POST `/api/cron/sweep` with `Authorization: Bearer ${{ secrets.CRON_SECRET }}`. The sweep advances meetings stuck in a non-terminal state for over 10 minutes and purges audio past its retention window.
+That commit is the actual fix, not the ping. GitHub disables `schedule:` workflows after 60 days of repository *push* inactivity — a scheduled run by itself does not count as activity. The heartbeat commit resets that clock every 3 days regardless of whether the app is deployed, so this works today, before Vercel is even connected, and keeps working forever without anyone touching the repo.
 
-Both need repo secrets `APP_URL` and `CRON_SECRET`. `/api/cron/sweep` rejects any request without a matching bearer token.
+**After connecting Vercel** (§7): add a repo variable `APP_URL` (Settings → Secrets and variables → Actions → Variables tab) set to your production URL, e.g. `https://syncmind.vercel.app`. Until then the ping step logs a skip message and only the heartbeat runs.
+
+**Redundant pinger (do this once, after Vercel is connected):** sign up free at [cron-job.org](https://cron-job.org) (no card), create a job that `GET`s `https://<your-app>.vercel.app/api/health` every 3 days. This is deliberately a second, independent service — a GitHub Actions outage or an account issue on this repo doesn't take down the only thing keeping Supabase awake.
+
+`.github/workflows/sweep.yml` — daily at 03:00 UTC, POST `/api/cron/sweep` with `Authorization: Bearer ${{ secrets.CRON_SECRET }}`. The sweep advances meetings stuck in a non-terminal state for over 10 minutes and purges audio past its retention window. **Not built yet** — it depends on the pipeline state machine (`docs/ROADMAP.md` M2), which doesn't exist in the codebase yet. `/api/cron/sweep` will reject any request without a matching `CRON_SECRET` bearer token once it exists.
 
 ## 9. Staying at zero cost
 

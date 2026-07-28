@@ -1,0 +1,44 @@
+name: Keepalive
+
+# GitHub disables scheduled workflows after 60 days with no repository push
+# activity — a workflow run does not count, only a git push does. This workflow
+# pushes a heartbeat commit every run specifically to prevent that, independent
+# of whether the app is deployed yet.
+on:
+  schedule:
+    - cron: "0 6 */3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ping-and-heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ping health endpoint
+        run: |
+          if [ -z "${{ vars.APP_URL }}" ]; then
+            echo "APP_URL repo variable not set yet — skipping ping, heartbeat still runs."
+          else
+            curl -fsS "${{ vars.APP_URL }}/api/health" || echo "Health check failed, continuing to heartbeat."
+          fi
+
+      - name: Write heartbeat
+        run: |
+          mkdir -p .github
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/heartbeat
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/heartbeat
+          if git diff --cached --quiet; then
+            echo "No change to commit."
+          else
+            git commit -m "chore: keepalive heartbeat"
+            git push
+          fi
