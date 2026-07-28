@@ -10,7 +10,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | 0.1 | `git init`, push to `dooddles07/SyncMind` (**public repo** — keeps GitHub Actions cron minutes free), `main` protected |
 | 0.2 | `create-next-app` — TypeScript, App Router, Tailwind v4, ESLint |
 | 0.3 | shadcn/ui init; add Button, Input, Card, Dialog, Tabs, Badge, Toast, Skeleton, Progress, DropdownMenu, Select, Textarea, AlertDialog, Tooltip, Avatar, Separator, Sheet, Command |
-| 0.4 | Design tokens from DESIGN-SYSTEM §2-4 into `app/globals.css`; fonts via `next/font`; `next-themes` wired |
+| 0.4 | **Done.** Design tokens (Room Tone, `app/globals.css` — the design-system doc was folded into code, see `CLAUDE.md`); fonts via `next/font`; `next-themes` wired |
 | 0.5 | Create Supabase project; run migrations `0001`-`0008` from DATA-MODEL |
 | 0.6 | Generate `lib/supabase/types.ts`; build browser/server/admin clients |
 | 0.7 | `.env.example` complete; `.gitignore`; local `.env.local` verified |
@@ -29,7 +29,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | # | Task |
 | --- | --- |
 | 1.1 | Google OAuth provider configured in Supabase Auth; `/auth/callback` route |
-| 1.2 | Landing page per DESIGN-SYSTEM §8 |
+| 1.2 | **Done.** Landing page (`app/page.tsx`, `components/marketing/**`) |
 | 1.3 | Authed layout: sidebar, user menu, theme toggle, mobile tab bar |
 | 1.4 | Route protection via middleware; unauthenticated users redirected |
 | 1.5 | Profile auto-creation trigger verified end to end |

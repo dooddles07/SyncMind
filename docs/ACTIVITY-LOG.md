@@ -4,6 +4,33 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — README fixed: no longer lies about its own status
+
+**Done:** P2.7/P2.8 from `docs/GAP-ANALYSIS.md`. The README's Status section said
+"Pre-build. Planning documents are complete; no application code exists yet" — true at
+commit db30f31, false for most of this project's life, and badly false after today's
+session (live deploy, CI, keepalive, exports, real Groq limits all shipped). It's the
+first thing anyone sees on the repo.
+
+- Status section now states the real, live state and links the live URL
+  (`sync-mind-three.vercel.app`) — previously not mentioned anywhere in the README, an
+  odd omission for a portfolio repo whose whole point is the live link.
+- Dead `docs/DESIGN-SYSTEM.md` link (deleted in db30f31) repointed to
+  `app/globals.css` in both the README's doc table and `docs/ROADMAP.md` M0.4/M1.2 —
+  matches `CLAUDE.md`'s existing "the code is now the doc" framing.
+- Quickstart ungated from "(once M0 lands)" — M0 substantially has. Clarified that
+  `.env.local` isn't needed yet since nothing reads it (no Supabase/AI calls exist),
+  rather than implying setup is required before `npm run dev` works.
+- Added a `GAP-ANALYSIS.md` row to the README's doc table — it's become the
+  actively-maintained punch list this session, worth surfacing alongside the other
+  docs.
+
+**Every "fix what's wrong" P2 item is now closed** (2.1, 2.2, 2.6, 2.7, 2.8). What
+remains in P2 is genuinely new build work: error/not-found pages (2.4), OG image
+(2.5), tests (2.9), error monitoring (2.10) — plus all of P1, the real backend.
+
+---
+
 ## 2026-07-28 — ESLint installed, `npm run lint` fixed
 
 **Done:** P2.1/P2.2 from `docs/GAP-ANALYSIS.md`. `npm run lint` ran `next lint` with no

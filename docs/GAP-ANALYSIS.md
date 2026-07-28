@@ -125,8 +125,8 @@ Ordered as a build sequence; each item is a real dependency of the next.
 | 2.4 | No error/not-found UI | Missing `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`, `app/loading.tsx`. A thrown error today shows the raw Next.js default. |
 | 2.5 | No OG image, no `robots.ts`, no `sitemap.ts`, no `manifest.ts` | For a portfolio link this is the highest-visibility gap on the list. Pasting the URL into LinkedIn/X/Discord currently previews as a bare title. `opengraph-image.tsx` with `next/og` is free and static. |
 | 2.6 | ~~No Vercel project connected~~ **Already done** | Discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/) since before this scan started. |
-| 2.7 | README is wrong on its own front page | Says "Pre-build. Planning documents are complete; no application code exists yet" — false. Links `docs/DESIGN-SYSTEM.md`, which was deleted in db30f31 — a 404 on the repo homepage. |
-| 2.8 | `ROADMAP.md` M0.4 and M5 still reference the deleted DESIGN-SYSTEM doc | Repoint to `app/globals.css`. |
+| 2.7 | ~~README is wrong on its own front page~~ **Resolved** | Status section now states the real, live state (deployed at sync-mind-three.vercel.app, UI on fixtures, no backend) with the live URL linked. Dead `DESIGN-SYSTEM.md` link repointed to `app/globals.css`. Quickstart ungated — works today, doesn't need M0 to "land" since it substantially already has. |
+| 2.8 | ~~`ROADMAP.md` still references the deleted DESIGN-SYSTEM doc~~ **Resolved** | M0.4 and M1.2 (the only two actual references — M5 turned out not to have one) repointed to `app/globals.css` and marked done. |
 | 2.9 | No tests | Vitest for the chunker offset math and `lib/types.ts` helpers (`isOverdue`, `formatTimecode`) is the minimum credible coverage; Playwright for the upload → ready happy path. |
 | 2.10 | No error monitoring | Sentry free tier, or skip it and rely on Vercel runtime logs (also $0, less useful). |
 
@@ -166,7 +166,7 @@ Nothing in the recommended stack requires a payment method at any step.
 
 1. ~~P0 decisions~~ **All done** — P0.1 (OAuth drop), P0.2 (keepalive heartbeat), P0.3 (mechanism live, nothing to keep alive yet), P0.4 (ffmpeg threading locked), P0.5 (real Groq limits confirmed, map-reduce threshold corrected) all shipped 2026-07-28.
 2. ~~P2.6 connect Vercel~~ **Already done**, discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/).
-3. ~~P2.1, P2.2, P2.6~~ **All done.** P2.7 (stale README) next — small, fully actionable now.
+3. ~~P2.1, P2.2, P2.6, P2.7, P2.8~~ **All done.** Every "fix what's wrong" P2 item is closed — what's left is genuinely new build work.
 4. P2.5 OG image + error pages — the demo now looks finished when shared, and it already has a real URL to share.
 5. P1.1 → P1.13 in order — the real build, M1 through M3.
 6. P3.
