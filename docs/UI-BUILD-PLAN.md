@@ -38,7 +38,9 @@ Verified: `tsc --noEmit` clean, `next build` clean (4 static routes), gallery re
 
 **Bug found and fixed during verification:** `ThemeToggle` gated its icon on `mounted` but not its `aria-label`, so the server rendered "Switch to dark mode" and the client replaced it on hydration. That is both a React hydration error and a screen reader announcing the wrong action. Anything derived from `resolvedTheme` must stay stable until after mount — icon *and* label. Server now emits a neutral "Toggle theme".
 
-**Still to build in Phase 2 — 14 primitives:** Input · Textarea · Select · Checkbox · Switch · Dialog · Sheet · DropdownMenu · Tabs · Tooltip · Avatar · Separator · Progress · Toast (sonner) · AlertDialog · Command.
+Second increment, also verified: `components/ui/input.tsx` (Input, Textarea, and a `Field` wrapper that ties label, control and error together with `aria-describedby`) · `components/ui/progress.tsx` · `components/ui/avatar.tsx` (Avatar and Separator). Gallery extended with all three. `tsc` and `next build` clean; confirmed `aria-describedby`, `role="progressbar"`, `aria-valuenow`, `aria-invalid` and the error-to-field id link all render.
+
+**Still to build in Phase 2 — 11 primitives:** Select · Checkbox · Switch · Dialog · Sheet · DropdownMenu · Tabs · Tooltip · Toast (sonner) · AlertDialog · Command.
 
 **Still to build — 12 product components:** Dropzone · ChunkProgress · AudioPlayer · TranscriptList · SpeakerChip · MinutesEditor · ActionTable · EmailComposer · AskPanel · KanbanBoard · QuotaBanner.
 

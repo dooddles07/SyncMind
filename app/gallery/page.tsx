@@ -5,6 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton, MeetingCardSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input, Textarea, Field } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, Separator } from "@/components/ui/avatar";
 import { StatusStepper } from "@/components/meeting/status-stepper";
 import type { MeetingStatus } from "@/lib/types";
 
@@ -135,6 +138,68 @@ export default function GalleryPage() {
           </Badge>
           <Badge variant="outline">AI-inferred</Badge>
         </div>
+      </Section>
+
+      <Section
+        title="Input and Field"
+        note="Borders use input-strong, not input. --input is 1.23:1 and fails WCAG 1.4.11 for control boundaries. Labels are always visible, never placeholder-only, and errors sit below the field tied with aria-describedby."
+      >
+        <div className="grid max-w-[880px] gap-6 md:grid-cols-2">
+          <Field id="title" label="Title" hint="Taken from the filename. Edit it if you like.">
+            <Input placeholder="Meeting title" defaultValue="Q3 Planning" />
+          </Field>
+          <Field id="date" label="Date">
+            <Input type="date" defaultValue="2026-07-24" />
+          </Field>
+          <Field
+            id="title-error"
+            label="Title"
+            error="Give the meeting a title so you can find it later."
+          >
+            <Input invalid defaultValue="" placeholder="Meeting title" />
+          </Field>
+          <Field id="disabled" label="Disabled">
+            <Input disabled placeholder="Meeting title" />
+          </Field>
+          <div className="md:col-span-2">
+            <Field id="note" label="Note">
+              <Textarea placeholder="Add a note" />
+            </Field>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Progress"
+        note="Determinate only. aria-valuenow plus a required label, so a screen reader gets both the number and what it refers to."
+      >
+        <div className="flex max-w-[560px] flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <span className="text-[14px] font-medium">Getting your recording ready</span>
+            <Progress value={4} max={6} label="Getting your recording ready" />
+            <span className="font-mono text-[13px] text-muted-foreground tabular">
+              part 4 of 6
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-[14px] font-medium">Transcription used today</span>
+            <Progress value={82} max={120} label="Transcription used today" tone="warning" />
+            <span className="text-[13px] text-muted-foreground">
+              82 of your 120 free minutes. This resets at midnight.
+            </span>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Avatar and Separator">
+        <div className="flex items-center gap-4">
+          <Avatar name="Maya" size="sm" />
+          <Avatar name="Dan" size="md" />
+          <Avatar name="Priya" size="lg" />
+          <Separator orientation="vertical" className="h-10" />
+          <span className="text-[14px] text-muted-foreground">Maya Chen</span>
+        </div>
+        <Separator className="max-w-[560px]" />
       </Section>
 
       <Section title="Card">
