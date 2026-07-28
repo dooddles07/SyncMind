@@ -18,7 +18,7 @@ Verified by reading: 68 tracked files, `npm run build` (passes), `npm run typech
 | Integrations | Resolved — no OAuth needed. `lib/export/gmail.ts` + `lib/export/ics.ts`. |
 | CI / cron | Keepalive done (`.github/workflows/keepalive.yml`, `app/api/health`). `ci.yml` and `sweep.yml` still missing. |
 | Tests | Do not exist. No runner installed. |
-| Deploy | Repo pushed to `github.com/dooddles07/SyncMind`. No `.vercel`, so likely not connected yet. |
+| Deploy | Repo pushed to `github.com/dooddles07/SyncMind`. **Vercel connected and live** at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/) — confirmed via `/api/health`. |
 
 Roughly: M0 partially done, M1 UI-only, M2-M5 not started.
 
@@ -63,7 +63,9 @@ Already in `ARCHITECTURE.md` §1, but the consequence for a *portfolio* is sharp
 
 Also confirm at signup time: free tier caps you at 2 active projects, so do not burn one on a throwaway.
 
-### P0.4 — `ffmpeg.wasm` needs cross-origin isolation headers that `next.config.ts` does not set
+### P0.4 — `ffmpeg.wasm` needs cross-origin isolation headers that `next.config.ts` does not set — **Resolved (decision locked)**
+
+Single-threaded chosen, documented in `ARCHITECTURE.md` §3.4 and `ROADMAP.md` M1.7. No code changes yet — there's no ffmpeg dependency or chunker to change, this only prevents the M1 build from defaulting to the wrong package. See `docs/ACTIVITY-LOG.md` 2026-07-28.
 
 [next.config.ts](next.config.ts) is four lines and sets no headers. The multithreaded `@ffmpeg/core-mt` build needs `SharedArrayBuffer`, which needs `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` on the document. Turning those on site-wide breaks any cross-origin resource that does not send CORP headers.
 
@@ -156,9 +158,9 @@ Nothing in the recommended stack requires a payment method at any step.
 
 ## Suggested order of work
 
-1. P0 decisions (OAuth drop, ffmpeg threading, Groq limits verified) — half a day, mostly reading and one commit to the docs.
-2. P2.7 + P2.1 + P2.2 + P2.6 — fix the README, add ESLint, add CI, connect Vercel. Half a day, and it gets a live URL on the portfolio *today* even though it is still a fixture demo.
-3. P2.5 OG image + error pages — the demo now looks finished when shared.
-4. P1.1 → P1.13 in order — the real build, M1 through M3.
-5. P0.1's `.ics` + compose deep link — replaces all of M4 in an afternoon.
+1. ~~P0 decisions~~ **Done** — P0.1 (OAuth drop), P0.2 (keepalive heartbeat), P0.4 (ffmpeg threading locked) shipped 2026-07-28. Only P0.5 (verify real Groq limits — needs your Groq console) remains, and it's not blocking anything else.
+2. ~~P2.6 connect Vercel~~ **Already done**, discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/).
+3. P2.7 + P2.1 + P2.2 — fix the remaining stale README claims, add ESLint, add `ci.yml`. Small, fully actionable now.
+4. P2.5 OG image + error pages — the demo now looks finished when shared, and it already has a real URL to share.
+5. P1.1 → P1.13 in order — the real build, M1 through M3.
 6. P3.

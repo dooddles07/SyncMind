@@ -4,6 +4,35 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — ffmpeg threading locked + APP_URL wired to the live deploy
+
+**Discovered mid-session:** Vercel was already connected, live at
+`https://sync-mind-three.vercel.app/`. Confirmed by curling `/api/health` from the
+previous commit — it returned a real deployed commit SHA, proving both prior commits
+were already pushed and live. This retroactively resolves P2.6 from
+`docs/GAP-ANALYSIS.md` ("not connected to Vercel yet") and unblocks the `APP_URL` repo
+variable `keepalive.yml` was built to read but had nothing to point at.
+
+**Done:**
+- P0.4 locked, docs-only: `ARCHITECTURE.md` §3.4 and `ROADMAP.md` M1.7 now pin
+  `@ffmpeg/core` (single-threaded) over `@ffmpeg/core-mt`, so the M1 chunker build
+  doesn't default into needing site-wide COOP/COEP headers. No code changed — ffmpeg
+  isn't installed yet, this only locks the decision before that work starts.
+- `APP_URL` GitHub Actions repo variable set to the live URL, so `keepalive.yml`'s
+  ping step does a real health check instead of no-op skipping. Triggered once
+  manually to confirm end to end.
+- `docs/GAP-ANALYSIS.md` updated: Deploy row now reflects the live URL, P0.4 marked
+  resolved, suggested order of work re-sequenced now that P0.1/P0.2/P0.4/P2.6 are all
+  done.
+
+**Still open:** P0.5 (verify real Groq limits — needs the user's Groq console, not
+blocking anything else). P2.1 (ESLint), P2.2 (`ci.yml`), P2.7 (README still claims
+"Pre-build, no application code exists yet" — false).
+
+**Next:** P2.1 + P2.2 + P2.7 are all small and fully actionable now.
+
+---
+
 ## 2026-07-28 — Keepalive workflow (fixes GitHub's 60-day scheduled-workflow auto-disable)
 
 **Done:** P0.2 from `docs/GAP-ANALYSIS.md`. GitHub disables `schedule:` workflows after

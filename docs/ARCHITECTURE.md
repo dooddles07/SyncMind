@@ -100,7 +100,22 @@ stateDiagram-v2
 
 ### 3.4 Client chunking
 
-Done with `ffmpeg.wasm` in a Web Worker:
+Done with `ffmpeg.wasm` in a Web Worker, using the **single-threaded `@ffmpeg/core`
+build, not `@ffmpeg/core-mt`.** Decided (`docs/GAP-ANALYSIS.md` P0.4) before any
+chunker code exists, so M1.7 gets built right the first time:
+
+- The multithreaded build needs `SharedArrayBuffer`, which needs
+  `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
+  require-corp` set on the document. Turning those on breaks any cross-origin
+  resource on that route that doesn't send matching CORP headers — a real risk on a
+  page that also touches Supabase Storage URLs and (potentially) third-party fonts or
+  images.
+- Single-threaded is 2-4x slower but has no header requirement at all — `next.config.ts`
+  stays untouched. For a chunker that only needs to keep up with upload speed, not
+  real-time, that trade is worth it. Revisit only if transcode time on a real 45-minute
+  file is the actual, measured complaint — not a guess.
+
+Steps:
 
 1. Probe duration. Reject over 2 hours at MVP.
 2. If the file is video, extract the audio track only.

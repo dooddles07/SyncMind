@@ -34,7 +34,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | 1.4 | Route protection via middleware; unauthenticated users redirected |
 | 1.5 | Profile auto-creation trigger verified end to end |
 | 1.6 | Dashboard with real meeting list, empty state, search |
-| 1.7 | `ffmpeg.wasm` Web Worker: probe duration, extract audio from video, transcode to 16 kHz mono Opus |
+| 1.7 | `ffmpeg.wasm` Web Worker: probe duration, extract audio from video, transcode to 16 kHz mono Opus. **Use `@ffmpeg/core` (single-threaded), not `@ffmpeg/core-mt`** — decided in `ARCHITECTURE.md` §3.4, avoids a site-wide COOP/COEP header requirement |
 | 1.8 | Chunker: 10-minute splits with 3s overlap, offsets computed — unit tested |
 | 1.9 | `POST /api/meetings` returning signed upload URLs |
 | 1.10 | Dropzone with validation, per-chunk upload progress, 2 parallel uploads |
