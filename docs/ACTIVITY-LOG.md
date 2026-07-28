@@ -4,6 +4,44 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — ESLint installed, `npm run lint` fixed
+
+**Done:** P2.1/P2.2 from `docs/GAP-ANALYSIS.md`. `npm run lint` ran `next lint` with no
+ESLint installed and no config — broken since the repo was scaffolded, and flagged as
+such in `CLAUDE.md`'s command list.
+
+- Installed `eslint@9` + `eslint-config-next@15.5.22`, pinned to exactly match the
+  installed Next version rather than a loose `^15` range.
+- `eslint.config.mjs` — flat config, `FlatCompat` bridging `next/core-web-vitals` +
+  `next/typescript` (the config shape `eslint-config-next` still ships, even under
+  ESLint 9's flat-config-only world). `next lint` itself is deprecated in Next 15 and
+  removed in 16, so the script now calls `eslint .` directly rather than routing
+  through Next's CLI.
+- Two real findings, both fixed in config rather than by touching working code: the
+  `_meetingId`-prefixed unused params in `lib/mock/data.ts` (intentional — those
+  getters mirror the real Supabase query signatures they'll be swapped for, per
+  `CLAUDE.md`) needed an `argsIgnorePattern: "^_"` override rather than a rename.
+  `next-env.d.ts` (Next's own auto-generated file, "should not be edited" per its own
+  header comment) needed an explicit ignore.
+- `npm run lint` passes clean. Wired into `.github/workflows/ci.yml` as a third step
+  (typecheck → lint → build), all green.
+- Fixed `CLAUDE.md`'s stale "BROKEN: next lint..." note in the commands list.
+
+**Aside:** `npm audit` reports 12 high-severity findings after this install. Checked
+each — none are actionable here. `sharp` (Next's own optional peer dep for image
+optimization, unused in this codebase so far) and an old bundled `postcss@8.4.31`
+(also Next's internal copy, unrelated to the project's own `postcss@8.5.24` via
+Tailwind) are both pre-existing surface from Next itself, not from this change; `npm
+audit fix --force`'s suggested remedy is downgrading Next to `9.3.3`, which would be
+far more damaging than the advisories themselves. The one genuinely install-related
+item, `brace-expansion` via ESLint's own transitive `minimatch`, is already on the
+patched `5.0.8` — the audit's merged range display made it look otherwise. All of this
+is dev-tooling-only; nothing here ships to the browser bundle.
+
+**Next:** P2.7 (README's stale "no application code exists yet" claim).
+
+---
+
 ## 2026-07-28 — Real Groq limits confirmed (resolves the last P0)
 
 **Done:** Pulled real per-model limits from `console.groq.com` → Limits, logged in

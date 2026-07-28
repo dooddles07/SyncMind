@@ -119,12 +119,12 @@ Ordered as a build sequence; each item is a real dependency of the next.
 
 | # | Gap | Fix |
 | --- | --- | --- |
-| 2.1 | `npm run lint` is broken — script says `next lint`, no ESLint installed, no config | Install `eslint` + `eslint-config-next` and add `eslint.config.mjs`. Note `next lint` is deprecated in Next 15 and gone in 16; move to the ESLint CLI directly. |
-| 2.2 | ~~No CI~~ **Resolved** | `.github/workflows/ci.yml`: typecheck + build on every push/PR. Lint step waits on 2.1 (ESLint not installed yet); unit step waits on 2.9 (no test runner). |
+| 2.1 | ~~`npm run lint` is broken~~ **Resolved** | `eslint@9` + `eslint-config-next@15.5.22` (matches installed Next exactly) installed, flat config at `eslint.config.mjs` using `FlatCompat` to bridge `next/core-web-vitals` + `next/typescript`. `npm run lint` now runs `eslint .` and passes clean. |
+| 2.2 | ~~No CI~~ **Resolved** | `.github/workflows/ci.yml`: typecheck + lint + build on every push/PR, all three green. Unit step still waits on 2.9 (no test runner). |
 | 2.3 | `keepalive.yml` **done** / `sweep.yml` still missing | See P0.2/P0.3. `sweep.yml` needs the pipeline state machine (P1/M2), not built yet. |
 | 2.4 | No error/not-found UI | Missing `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`, `app/loading.tsx`. A thrown error today shows the raw Next.js default. |
 | 2.5 | No OG image, no `robots.ts`, no `sitemap.ts`, no `manifest.ts` | For a portfolio link this is the highest-visibility gap on the list. Pasting the URL into LinkedIn/X/Discord currently previews as a bare title. `opengraph-image.tsx` with `next/og` is free and static. |
-| 2.6 | No Vercel project connected | No `.vercel` directory. Nothing is deployed, so there is no link to put on the portfolio. |
+| 2.6 | ~~No Vercel project connected~~ **Already done** | Discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/) since before this scan started. |
 | 2.7 | README is wrong on its own front page | Says "Pre-build. Planning documents are complete; no application code exists yet" — false. Links `docs/DESIGN-SYSTEM.md`, which was deleted in db30f31 — a 404 on the repo homepage. |
 | 2.8 | `ROADMAP.md` M0.4 and M5 still reference the deleted DESIGN-SYSTEM doc | Repoint to `app/globals.css`. |
 | 2.9 | No tests | Vitest for the chunker offset math and `lib/types.ts` helpers (`isOverdue`, `formatTimecode`) is the minimum credible coverage; Playwright for the upload → ready happy path. |
@@ -166,7 +166,7 @@ Nothing in the recommended stack requires a payment method at any step.
 
 1. ~~P0 decisions~~ **All done** — P0.1 (OAuth drop), P0.2 (keepalive heartbeat), P0.3 (mechanism live, nothing to keep alive yet), P0.4 (ffmpeg threading locked), P0.5 (real Groq limits confirmed, map-reduce threshold corrected) all shipped 2026-07-28.
 2. ~~P2.6 connect Vercel~~ **Already done**, discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/).
-3. ~~P2.2~~ **Done** — `ci.yml` shipped. P2.7 + P2.1 — fix the remaining stale README claims, add ESLint (then wire it into `ci.yml`'s lint step). Small, fully actionable now.
+3. ~~P2.1, P2.2, P2.6~~ **All done.** P2.7 (stale README) next — small, fully actionable now.
 4. P2.5 OG image + error pages — the demo now looks finished when shared, and it already has a real URL to share.
 5. P1.1 → P1.13 in order — the real build, M1 through M3.
 6. P3.

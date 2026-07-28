@@ -14,7 +14,7 @@ SyncMind is an AI meeting assistant (audio in → transcript, notes, to-dos, fol
 npm run dev        # next dev, localhost:3000
 npm run build      # next build
 npm run typecheck  # tsc --noEmit  <- the real gate, run after any change
-npm run lint       # BROKEN: next lint with no eslint installed and no config. Do not rely on it.
+npm run lint       # eslint ., flat config in eslint.config.mjs, wired into CI
 ```
 
 No test runner is installed. `docs/ARCHITECTURE.md` §10 plans Vitest (unit + integration) and Playwright (E2E); neither exists yet. If asked to add tests, that is new setup work, not a config tweak.
