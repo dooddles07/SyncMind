@@ -57,11 +57,15 @@ M0.9 keepalive and M2.11 sweep both rely on `schedule:` workflows. GitHub **disa
 - Have the keepalive workflow itself commit a heartbeat (e.g. append a line to a `.github/heartbeat` file) so the repo is never inactive.
 - Add a second, independent pinger: a free `cron-job.org` job hitting `/api/health` every 3 days. Redundancy costs nothing.
 
-### P0.3 — Supabase free project pauses after 7 idle days
+### P0.3 — Supabase free project pauses after 7 idle days — **Mechanism resolved, nothing to keep alive yet**
 
-Already in `ARCHITECTURE.md` §1, but the consequence for a *portfolio* is sharper than for a product: a paused project means a recruiter clicking your link gets a broken app, and restore is a manual dashboard click. P0.2's mechanism is in place; still blocked on Supabase not existing yet (P1) and Vercel not being connected (P2.6) — `APP_URL` repo variable is unset until then, so the health ping currently no-ops.
+`APP_URL` is set and `keepalive.yml` verified running end to end (2026-07-28). The
+prevention mechanism is fully live. What it protects — a Supabase project — doesn't
+exist yet (P1); this closes itself the moment Supabase is created, no further action
+needed.
 
-Also confirm at signup time: free tier caps you at 2 active projects, so do not burn one on a throwaway.
+Confirm at signup time: free tier caps you at 2 active projects, so do not burn one on
+a throwaway.
 
 ### P0.4 — `ffmpeg.wasm` needs cross-origin isolation headers that `next.config.ts` does not set — **Resolved (decision locked)**
 
@@ -75,9 +79,11 @@ Single-threaded chosen, documented in `ARCHITECTURE.md` §3.4 and `ROADMAP.md` M
 
 Recommend single-threaded for MVP; revisit only if transcode time is the actual complaint.
 
-### P0.5 — Groq model ids and free limits are unverified placeholders
+### P0.5 — Groq model ids and free limits are unverified placeholders — **Resolved**
 
-Already open item #1-2 in [ACTIVITY-LOG.md](ACTIVITY-LOG.md). `GROQ_DAILY_LLM_TOKENS=400000` in [.env.example](../.env.example) is a guess, and `llama-3.3-70b-versatile` may have been deprecated. A wrong ceiling means either a 429 in front of a recruiter or an unnecessarily crippled demo.
+Confirmed 2026-07-28 at `console.groq.com` → Limits. Both model ids are current, not deprecated. Real numbers set in `.env.example`, full table in `AI-PIPELINE.md` §7. The `400000` token placeholder was not just imprecise — it was **4x over** the real 100,000/day cap.
+
+Bigger finding than the daily-total mismatch: `llama-3.3-70b-versatile` has a **12,000 tokens/minute** cap that the docs never accounted for. A single analysis call for a 1-hour meeting (~26k input tokens) blows straight through it regardless of daily budget remaining. The old map-reduce threshold (60,000 tokens, sized against the 128k context window) was solving the wrong constraint — fixed to ~5,000 tokens in `AI-PIPELINE.md` §3, sized against the real rate limit instead. Same class of gap found for ASR: a 7,200 audio-sec/hour cap that daily-only tracking wouldn't catch. Both are flagged as required behavior for `lib/quota.ts` when it's built (M2.9) — it doesn't exist yet, so nothing to fix in code today, only in the spec it'll be built from.
 
 Do this before M2: `curl https://api.groq.com/openai/v1/models` with your key, then read console → Settings → Limits per model, then write the real numbers into the env defaults and log them.
 
@@ -144,7 +150,7 @@ Ordered as a build sequence; each item is a real dependency of the next.
 | --- | --- | --- |
 | Vercel Hobby | Keep | Non-commercial only. Design stays inside 60s functions. |
 | Supabase Free | Keep | Keepalive must be redundant (P0.2). 2 projects max. |
-| Groq | Keep | Verify real per-model limits before tuning quota (P0.5). |
+| Groq | Keep | Real per-model limits confirmed (P0.5) — see `AI-PIPELINE.md` §7. |
 | Gemini (AI Studio) | Keep | Fallback provider, free tier. |
 | GitHub Actions | Keep | Public repo only. Heartbeat commit required (P0.2). |
 | Google OAuth / Gmail / Calendar | **Drop for MVP** | Restricted scope verification is not free; Testing mode expires tokens weekly. Replace with compose deep link + `.ics`. |
@@ -158,7 +164,7 @@ Nothing in the recommended stack requires a payment method at any step.
 
 ## Suggested order of work
 
-1. ~~P0 decisions~~ **Done** — P0.1 (OAuth drop), P0.2 (keepalive heartbeat), P0.4 (ffmpeg threading locked) shipped 2026-07-28. Only P0.5 (verify real Groq limits — needs your Groq console) remains, and it's not blocking anything else.
+1. ~~P0 decisions~~ **All done** — P0.1 (OAuth drop), P0.2 (keepalive heartbeat), P0.3 (mechanism live, nothing to keep alive yet), P0.4 (ffmpeg threading locked), P0.5 (real Groq limits confirmed, map-reduce threshold corrected) all shipped 2026-07-28.
 2. ~~P2.6 connect Vercel~~ **Already done**, discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/).
 3. ~~P2.2~~ **Done** — `ci.yml` shipped. P2.7 + P2.1 — fix the remaining stale README claims, add ESLint (then wire it into `ci.yml`'s lint step). Small, fully actionable now.
 4. P2.5 OG image + error pages — the demo now looks finished when shared, and it already has a real URL to share.

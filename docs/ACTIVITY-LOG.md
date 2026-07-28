@@ -4,6 +4,46 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — Real Groq limits confirmed (resolves the last P0)
+
+**Done:** Pulled real per-model limits from `console.groq.com` → Limits, logged in
+`docs/AI-PIPELINE.md` §7. Both open items from the very first planning session (below,
+2026-07-28 — Planning session) are now closed:
+
+- `whisper-large-v3-turbo` and `llama-3.3-70b-versatile` are both current, neither
+  deprecated.
+- Real ceilings — `whisper-large-v3-turbo`: 20 req/min, 2,000 req/day, 7,200
+  audio-sec/hour, 28,800 audio-sec/day. `llama-3.3-70b-versatile`: 30 req/min, 1,000
+  req/day, 12,000 tokens/min, **100,000 tokens/day** (the old `400000` placeholder in
+  `.env.example` was 4x over the real cap, not just imprecise). `llama-3.1-8b-instant`
+  (Ask): 30 req/min, 14,400 req/day, 6,000 tokens/min, 500,000 tokens/day.
+
+**Bigger finding than the daily mismatch:** the 12,000-tokens/minute cap on
+`llama-3.3-70b-versatile` is far tighter than anything the docs accounted for. A
+single analysis call for a 1-hour meeting (~26k input tokens, per the existing §7 cost
+table) exceeds it on its own — independent of daily budget remaining, independent of
+the 128k context window. The old map-reduce trigger (60,000 tokens) was sized against
+context-window safety, which is the wrong constraint; it let the common case
+(single-pass) fail against a limit it never checked. Corrected in `AI-PIPELINE.md` §3:
+map-reduce now triggers at ~5,000 tokens, sized against the real rate limit, with
+proportionally smaller map windows (4,000 tokens vs. the old 15,000). Also documented
+the parallel gap on the ASR side (7,200 audio-sec/hour, tighter than daily-only
+tracking would catch).
+
+**Updated:** `.env.example` (real `GROQ_DAILY_*` defaults), `AI-PIPELINE.md` §3 and §7,
+`ROADMAP.md` M0.11 and M3.4, `GAP-ANALYSIS.md` P0.5.
+
+**Still open, for whoever builds `lib/quota.ts` (M2.9, doesn't exist yet):** it must
+track per-minute and per-hour usage, not just daily sums, or a call can pass the daily
+check and still get 429'd by Groq. This is a spec correction, not a code fix — there is
+no `lib/quota.ts` yet to have gotten wrong.
+
+**All five P0 items from `docs/GAP-ANALYSIS.md` are now resolved.** Next is P2:
+`npm run lint` is broken (no ESLint installed), and the README still claims "no
+application code exists yet."
+
+---
+
 ## 2026-07-28 — CI workflow
 
 **Done:** `.github/workflows/ci.yml` — typecheck + build on every push to `main` and

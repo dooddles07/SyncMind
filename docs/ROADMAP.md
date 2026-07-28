@@ -17,7 +17,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | 0.8 | Vercel project connected, preview deploys on PR |
 | 0.9 | `ci.yml` — **done**: typecheck + build on every push and PR. Lint and unit steps wait on P2.1 (ESLint not installed) and Vitest (not configured). `keepalive.yml` — **done**: every 3 days, pings `/api/health` and self-commits a heartbeat so GitHub never auto-disables it from 60 days of repo inactivity, independent of deploy state. See `docs/GAP-ANALYSIS.md` P0.2. |
 | 0.10 | Vitest and Playwright configured with one passing test each |
-| 0.11 | Check `console.groq.com` → Settings → Limits for both models; set real `GROQ_DAILY_*` values in `lib/quota.ts` defaults and log the confirmed numbers in ACTIVITY-LOG (see AI-PIPELINE §7) |
+| 0.11 | **Done**: real `GROQ_DAILY_*` values confirmed at `console.groq.com` → Limits and set in `.env.example`, logged in ACTIVITY-LOG. `lib/quota.ts` itself still needs building (M2.9) — see AI-PIPELINE §7 for two gaps found (per-minute and per-hour caps, not just daily) it must account for |
 
 **Exit:** an empty themed app deploys to Vercel, connects to Supabase, and CI is green.
 
@@ -73,7 +73,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | 3.1 | `lib/ai/structured.ts` — call, parse, validate, repair, fall back |
 | 3.2 | Zod schemas from AI-PIPELINE §3 with post-validation clamps |
 | 3.3 | Analysis prompt files; single-pass path |
-| 3.4 | Map-reduce path above 60k tokens |
+| 3.4 | Map-reduce path above ~5k tokens (not 60k — see `AI-PIPELINE.md` §3, the real binding constraint is Groq's 12k-tokens/minute rate limit, not the 128k context window) |
 | 3.5 | Persist `summaries` + `action_items`; apply speaker labels to segments |
 | 3.6 | Gemini fallback client behind the same interface |
 | 3.7 | Minutes tab with inline editing and timestamp seek |

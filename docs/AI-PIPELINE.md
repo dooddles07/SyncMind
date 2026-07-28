@@ -54,12 +54,14 @@ This is deliberately labeled *diarization-lite* in the UI. It is an inference fr
 
 ### Context handling
 
-`llama-3.3-70b-versatile` has a 128k context window, which comfortably fits a 2-hour transcript (~18k words ≈ 24k tokens). Single-pass is the normal path.
+`llama-3.3-70b-versatile` has a 128k context window, which comfortably fits a 2-hour transcript (~18k words ≈ 24k tokens) — **but the binding constraint is not context, it's Groq's rate limit.** Confirmed at `console.groq.com` → Limits (2026-07-28): `llama-3.3-70b-versatile` is capped at **12,000 tokens/minute**, far below the 128k window. A single analysis call for a 1-hour meeting (~26k input tokens, §7) already exceeds that on its own — the model would happily accept it, Groq's rate limiter would 429 it. The original 60,000-token map-reduce threshold was sized against the context window; it is roughly 5x too large for the real constraint and would let most single-pass calls fail.
 
-Map-reduce is used only when the assembled transcript exceeds **60,000 tokens** (a safety margin well under the true limit, leaving room for output):
+Map-reduce is used whenever the assembled transcript exceeds **~5,000 tokens**, leaving headroom under the 12k/minute cap for prompt overhead (~1k) and output (~2.5k) within the same call:
 
-1. **Map** — split at natural pauses into ~15,000-token windows with 500-token overlap. Run a reduced prompt on each returning only `overview`, `topics`, `decisions`, `openQuestions`, `actionItems`.
+1. **Map** — split at natural pauses into ~4,000-token windows with 300-token overlap (also sized to the 12k/minute cap, not the context window). Run a reduced prompt on each returning only `overview`, `topics`, `decisions`, `openQuestions`, `actionItems`.
 2. **Reduce** — feed the concatenated JSON of all windows into the full prompt with instruction to merge, deduplicate, and produce one coherent set.
+
+Practically: almost every real meeting over ~5-10 minutes will map-reduce, not single-pass. That's the correct behavior given the confirmed rate limit, not a bug to "fix" by raising the threshold back up. Map calls run sequentially with a short delay between them so the sequence itself doesn't trip the 30-requests/minute cap on the same model.
 
 When map-reduce runs, `summaries.model` records `llama-3.3-70b-versatile+mapreduce` and the UI notes that the meeting was analyzed in sections.
 
@@ -272,23 +274,29 @@ Everything below is free-tier consumption, not currency.
 | Email LLM | 1 call, ~1.5k in / ~0.4k out |
 | Total LLM calls | 2 (plus 1 per Ask) |
 
-Configured daily ceilings, enforced in `lib/quota.ts` before any upstream call:
+**Confirmed 2026-07-28 at `console.groq.com` → Limits** (organization base limits, no paid plan):
+
+| Model | Req/min | Req/day | Tokens or audio-sec /min or /hour | Tokens or audio-sec /day |
+| --- | --- | --- | --- | --- |
+| `whisper-large-v3-turbo` (ASR) | 20 | 2,000 | 7,200 audio-sec/hour | 28,800 audio-sec/day |
+| `llama-3.3-70b-versatile` (analysis, email) | 30 | 1,000 | 12,000 tokens/min | 100,000 tokens/day |
+| `llama-3.1-8b-instant` (Ask) | 30 | 14,400 | 6,000 tokens/min | 500,000 tokens/day |
+
+Configured daily ceilings, enforced in `lib/quota.ts` before any upstream call — set to the confirmed numbers above, not guesses:
 
 | Env var | Default | Rationale |
 | --- | --- | --- |
-| `GROQ_DAILY_AUDIO_SECONDS` | 21600 | ~6 hours of audio per user per day |
-| `GROQ_DAILY_ASR_CALLS` | 60 | ~10 meetings |
-| `GROQ_DAILY_LLM_CALLS` | 80 | analysis + email + asks |
-| `GROQ_DAILY_LLM_TOKENS` | 400000 | placeholder — **must be re-tuned against real limits, see below** |
+| `GROQ_DAILY_AUDIO_SECONDS` | 28800 | Real daily cap for `whisper-large-v3-turbo`. Note the tighter *hourly* sub-limit below — daily tracking alone doesn't catch a burst within one hour. |
+| `GROQ_DAILY_ASR_CALLS` | 2000 | Real daily cap. ~330 ten-minute chunks. |
+| `GROQ_DAILY_LLM_CALLS` | 1000 | Real daily cap for `llama-3.3-70b-versatile` (analysis + email). Ask uses the separate, much higher `llama-3.1-8b-instant` ceiling — see below. |
+| `GROQ_DAILY_LLM_TOKENS` | 100000 | Real daily cap for `llama-3.3-70b-versatile`. **5x tighter than the old 400000 placeholder.** At ~30k tokens per 1-hour meeting (analysis + email, §7 table above), that's roughly 3 fully-processed 1-hour meetings per day before `quota_blocked` — tight for Maya's persona (6-10 meetings/week ≈ 1-2/day), workable but worth watching post-launch. |
 
-**These defaults are unverified against Groq's actual current numbers and are very likely too generous.** Third-party trackers as of mid-2026 put the free tier for `llama-3.3-70b-versatile` around 1,000 requests/day and a per-minute token cap in the low tens of thousands — not officially confirmed, but if directionally correct, a single analysis call (~26k input tokens for a 1-hour meeting) could hit the per-*minute* ceiling on its own, independent of the daily total. `lib/quota.ts` as specified only tracks daily sums; it has no per-minute awareness.
+**Two real gaps this surfaced, both now reflected in this doc, neither yet reflected in code** (`lib/quota.ts` doesn't exist yet — flagging for whoever builds it, M2.9):
 
-Before tuning these env vars (M0/M2), pull the authoritative numbers from `console.groq.com` → Settings → Limits (per-model, logged in) and:
-1. Set `GROQ_DAILY_LLM_TOKENS` to the real per-model daily figure, not a guess.
-2. If a per-minute token cap exists and is anywhere near the size of one analysis call, either (a) confirm Groq queues/backs off automatically on 429 — the retry ladder in ARCHITECTURE §7 already handles this — or (b) shrink the map-reduce threshold in §3 below 60k tokens so single calls stay comfortably under the per-minute cap.
-3. Log the confirmed numbers in ACTIVITY-LOG so this stops being an open item.
+1. **Per-minute token cap, not just daily.** `llama-3.3-70b-versatile` caps at 12,000 tokens/minute. A single analysis call for a 1-hour meeting (~26k input tokens) exceeds that on its own, independent of the daily 100k total. This is why §3's map-reduce threshold dropped from 60,000 to ~5,000 tokens — see there for the full reasoning. `lib/quota.ts` must track per-minute usage per model, not just daily sums, or it will let a call through that Groq immediately 429s.
+2. **Per-hour audio-seconds cap, not just daily.** 7,200 audio-sec/hour (2 hours of audio) is tighter than a naive daily-only tracker would catch for a user uploading several long meetings back to back within the same hour.
 
-Exceeding a ceiling sets `meetings.status = 'quota_blocked'` with `resume_at` at the next UTC midnight. This is a product behavior with UI copy, not an exception. A burst of uploads cannot bypass this: every ASR/LLM call — not just the meeting-create step — checks projected spend against the ceiling first, so ten simultaneous uploads throttle at the same per-unit gate a single large meeting would.
+Exceeding a ceiling sets `meetings.status = 'quota_blocked'` with `resume_at` at the next UTC midnight (for daily ceilings) or the top of the next minute/hour (for the per-minute/per-hour ones above). This is a product behavior with UI copy, not an exception. A burst of uploads cannot bypass this: every ASR/LLM call — not just the meeting-create step — checks projected spend against the ceiling first, so ten simultaneous uploads throttle at the same per-unit gate a single large meeting would.
 
 ## 8. Quality evaluation
 
