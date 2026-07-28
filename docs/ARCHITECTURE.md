@@ -30,7 +30,7 @@ flowchart TB
     end
 
     subgraph Supabase
-        AUTH[Auth<br/>Google OAuth]
+        AUTH[Auth<br/>Google sign-in only]
         DB[(Postgres<br/>+ RLS)]
         ST[(Storage<br/>audio bucket)]
     end
@@ -39,7 +39,7 @@ flowchart TB
         GROQ_W[Groq Whisper<br/>large-v3-turbo]
         GROQ_L[Groq LLM<br/>llama-3.3-70b]
         GEM[Gemini<br/>fallback]
-        GAPI[Google APIs<br/>Gmail drafts, Calendar]
+        GAPI[Browser only<br/>Gmail compose link, .ics download]
     end
 
     UP --> ST
@@ -122,7 +122,7 @@ syncmind/
 │   │   ├── dashboard/page.tsx        Meeting list
 │   │   ├── upload/page.tsx           Upload + chunking UI
 │   │   ├── actions/page.tsx          Cross-meeting kanban
-│   │   ├── settings/page.tsx         Google connections, retention, profile
+│   │   ├── settings/page.tsx         Retention, profile
 │   │   └── meetings/[id]/
 │   │       ├── page.tsx              Shell + status poller
 │   │       ├── minutes/page.tsx
@@ -145,16 +145,15 @@ syncmind/
 │   ├── ai/                           groq.ts, gemini.ts, prompts/, schemas.ts,
 │   │                                 chunk-transcribe.ts, analyze.ts, ask.ts
 │   ├── audio/                        ffmpeg-worker.ts, chunker.ts, stitch.ts
-│   ├── google/                       oauth.ts, gmail.ts, calendar.ts
 │   ├── pipeline/                     advance.ts, state.ts, locks.ts
-│   ├── export/                       markdown.ts, ics.ts, srt.ts
+│   ├── export/                       markdown.ts, ics.ts, srt.ts, gmail.ts
 │   └── quota.ts                      free-tier accounting
 ├── supabase/migrations/              numbered SQL files
 ├── docs/
 └── .github/workflows/                keepalive.yml, sweep.yml, ci.yml
 ```
 
-**Rules.** Server Components read data directly through the server Supabase client; no `/api` round-trip for reads the page owns. Route handlers exist for mutations, external API calls, and anything needing a secret. Secrets (`GROQ_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, Google client secret) are referenced only inside `app/api/**` and `lib/**` modules imported by them — never in a `"use client"` file.
+**Rules.** Server Components read data directly through the server Supabase client; no `/api` round-trip for reads the page owns. Route handlers exist for mutations, external API calls, and anything needing a secret. Secrets (`GROQ_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, Google client secret) are referenced only inside `app/api/**` and `lib/**` modules imported by them — never in a `"use client"` file. `lib/export/ics.ts` and `lib/export/gmail.ts` hold no secret and run entirely client-side.
 
 ## 5. API contracts
 
@@ -199,18 +198,16 @@ All routes require an authenticated Supabase session unless marked public. All r
 ### Email and calendar
 
 **`POST /api/meetings/:id/email/regenerate`** — `{ "tone": "professional" | "friendly" | "brief" }` → new draft body. Does not touch Google.
-**`POST /api/meetings/:id/email/gmail-draft`** — creates a Gmail draft. Returns `{ "draftId", "gmailUrl" }`. **Never sends.**
-**`POST /api/actions/:id/calendar`** and **`POST /api/meetings/:id/calendar/bulk`** — create Calendar events; store `google_event_id` to prevent duplicates.
 
-### Google connection
-
-**`GET /api/google/connect`** — redirect to Google consent with incremental scopes.
-**`GET /api/google/callback`** — exchange code, store encrypted refresh token, redirect back to origin.
-**`POST /api/google/disconnect`** — revoke token, clear stored credentials.
+No route creates a Gmail draft or a Calendar event. `lib/export/gmail.ts` builds a
+`mail.google.com/mail/?view=cm` compose link client-side from the draft already in
+scope; `lib/export/ics.ts` builds an RFC 5545 file client-side and triggers a browser
+download. Both run entirely in the browser — no route handler, no Google API call, no
+stored token. See `docs/GAP-ANALYSIS.md` P0.1.
 
 ### Export and share
 
-**`GET /api/meetings/:id/export?format=md|ics`** — file download. PDF is client-side via the print stylesheet, not a server route.
+**`GET /api/meetings/:id/export?format=md|srt|txt`** — file download. PDF is client-side via the print stylesheet, not a server route. `.ics` export is client-side, not a server route (see above).
 **`POST /api/meetings/:id/share`** — `{ "includeTranscript": bool }` → `{ "token", "url" }`.
 **`DELETE /api/share/:token`** — revoke.
 **`GET /share/:token`** — *public page*, served by a Server Component using the admin client scoped strictly to the token's meeting.
@@ -267,8 +264,6 @@ sequenceDiagram
 | Groq 5xx / timeout | Up to 3 attempts with exponential backoff (2s, 6s, 18s), tracked in `audio_chunks.attempts`. After 3, mark the chunk `failed`; the meeting goes `failed` but every completed chunk is preserved. |
 | LLM returns malformed JSON | One repair pass (see AI-PIPELINE §5). If it fails again, fall back to Gemini. If that fails, `failed` with `ANALYZE_INVALID_OUTPUT`. |
 | Storage download fails | Treated as a chunk failure; same retry ladder. |
-| Google API 401 | Refresh the token once. If refresh fails, clear the connection and prompt the user to reconnect; the pending action resumes after reconnect. |
-| Google API 403 quota | Surface plainly. Never silently drop a calendar event. |
 | Advisory lock contention | Return current state with 200. Not an error. |
 
 ### Principles
@@ -296,6 +291,6 @@ sequenceDiagram
 | Unit | Vitest | chunk offset math, seam de-duplication, JSON schema validation and repair, .ics and .srt generation, quota arithmetic |
 | Integration | Vitest + local Supabase | RLS policies (a second user must get zero rows), pipeline state transitions, idempotency of `advance` |
 | E2E | Playwright | sign-in stub → upload a 30s fixture → poll to ready → edit an action → generate share link → verify public page. External APIs mocked at the network layer. |
-| Manual | checklist in ROADMAP | real Google OAuth, real Gmail draft, real Calendar event, mobile layout |
+| Manual | checklist in ROADMAP | real Google sign-in, Gmail compose link opens correctly, downloaded `.ics` imports correctly, mobile layout |
 
 CI (`ci.yml`) runs typecheck, lint, unit, and integration on every push; E2E on PRs to `main`.

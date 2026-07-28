@@ -51,7 +51,6 @@ export interface Todo {
   priority: Priority;
   status: TodoStatus;
   at: number;
-  onCalendar: boolean;
 }
 
 export interface Meeting {

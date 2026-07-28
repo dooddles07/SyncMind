@@ -120,7 +120,6 @@ export const todos: Todo[] = [
     priority: "high",
     status: "doing",
     at: 259,
-    onCalendar: true,
   },
   {
     id: "a2",
@@ -133,7 +132,6 @@ export const todos: Todo[] = [
     priority: "high",
     status: "todo",
     at: 1721,
-    onCalendar: false,
   },
   {
     id: "a3",
@@ -146,7 +144,6 @@ export const todos: Todo[] = [
     priority: "medium",
     status: "todo",
     at: 291,
-    onCalendar: false,
   },
   {
     id: "a4",
@@ -159,7 +156,6 @@ export const todos: Todo[] = [
     priority: "medium",
     status: "doing",
     at: 480,
-    onCalendar: true,
   },
   {
     id: "a5",
@@ -172,7 +168,6 @@ export const todos: Todo[] = [
     priority: "low",
     status: "todo",
     at: 298,
-    onCalendar: false,
   },
   {
     id: "a6",
@@ -185,7 +180,6 @@ export const todos: Todo[] = [
     priority: "medium",
     status: "done",
     at: 903,
-    onCalendar: true,
   },
   {
     id: "a7",
@@ -198,7 +192,6 @@ export const todos: Todo[] = [
     priority: "high",
     status: "done",
     at: 1450,
-    onCalendar: false,
   },
 ];
 

@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { X } from "lucide-react";
 import type { Metadata } from "next";
 import { RetentionSlider } from "@/components/app/retention-slider";
 import { Badge } from "@/components/ui/badge";
@@ -49,23 +49,30 @@ export default async function SettingsPage() {
       </Section>
 
       <Section
-        title="What SyncMind can touch in your Google account"
-        description="Only these two things, and nothing else. You can take either back at any time."
+        title="What SyncMind can reach in your Google account"
+        description="Your name and your email address, so you can sign in. That is the whole list."
       >
-        <ul className="flex flex-col gap-2">
-          <li className="flex items-center gap-2 text-sm">
-            <Check className="size-4 text-done-text" aria-hidden />
-            Add events to your calendar
+        <ul className="flex flex-col gap-2 text-sm">
+          <li className="flex items-center gap-2">
+            <X className="size-4 text-muted-foreground" aria-hidden />
+            It cannot read your email
+            <Badge tone="done">No access</Badge>
           </li>
-          <li className="flex items-center gap-2 text-sm">
-            <Check className="size-4 text-done-text" aria-hidden />
-            Save drafts in Gmail
-            <Badge tone="done">Cannot send</Badge>
+          <li className="flex items-center gap-2">
+            <X className="size-4 text-muted-foreground" aria-hidden />
+            It cannot send email as you
+            <Badge tone="done">No access</Badge>
+          </li>
+          <li className="flex items-center gap-2">
+            <X className="size-4 text-muted-foreground" aria-hidden />
+            It cannot see or change your calendar
+            <Badge tone="done">No access</Badge>
           </li>
         </ul>
-        <Button variant="outline" size="sm" className="mt-4">
-          Disconnect Google
-        </Button>
+        <p className="mt-4 max-w-[60ch] text-sm text-muted-foreground">
+          Follow-up emails open in your own Gmail with the text filled in, and dates
+          download as a calendar file you open yourself. SyncMind never holds the keys.
+        </p>
       </Section>
 
       <Section

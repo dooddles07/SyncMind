@@ -1,48 +1,47 @@
 "use client";
 
-import { CalendarCheck, CalendarPlus } from "lucide-react";
-import { useState } from "react";
+import { CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { datedTodos, downloadIcs } from "@/lib/export/ics";
 import { formatDate, formatTimecode, isOverdue, type Todo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const priorityTone = { high: "overdue", medium: "said", low: "neutral" } as const;
 
-export function TodoTable({ initial }: { initial: Todo[] }) {
-  const [todos, setTodos] = useState(initial);
-  const undated = todos.filter((t) => !t.due).length;
-  const addable = todos.filter((t) => t.due && !t.onCalendar).length;
+export function TodoTable({ initial, meetingTitle }: { initial: Todo[]; meetingTitle: string }) {
+  const undated = initial.filter((t) => !t.due).length;
+  const dated = datedTodos(initial);
 
-  function addAll() {
-    setTodos((all) => all.map((t) => (t.due ? { ...t, onCalendar: true } : t)));
-    toast.success(`Saved ${addable} to your calendar`);
+  function saveAll() {
+    downloadIcs(dated, meetingTitle);
+    toast.success(`Downloaded ${dated.length} dates. Open the file to add them.`);
   }
 
-  function addOne(id: string) {
-    setTodos((all) => all.map((t) => (t.id === id ? { ...t, onCalendar: true } : t)));
-    toast.success("Saved to your calendar");
+  function saveOne(todo: Todo) {
+    downloadIcs([todo], todo.title);
+    toast.success("Downloaded. Open the file to add it.");
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          <span className="tabular">{todos.length}</span> to-do
-          {todos.length === 1 ? "" : "s"} came out of this meeting
+          <span className="tabular">{initial.length}</span> to-do
+          {initial.length === 1 ? "" : "s"} came out of this meeting
           {undated > 0 && <>, {undated} without a date</>}.
         </p>
-        {addable > 0 && (
-          <Button size="sm" variant="outline" onClick={addAll}>
+        {dated.length > 0 && (
+          <Button size="sm" variant="outline" onClick={saveAll}>
             <CalendarPlus className="size-4" aria-hidden />
-            Save all {addable} dates to my calendar
+            Put all {dated.length} dates in my calendar
           </Button>
         )}
       </div>
 
       <ul className="flex flex-col gap-2">
-        {todos.map((t) => {
+        {initial.map((t) => {
           const late = isOverdue(t);
           return (
             <li
@@ -74,18 +73,12 @@ export function TodoTable({ initial }: { initial: Todo[] }) {
                 {late && <Badge tone="overdue">Overdue</Badge>}
                 {t.ownerInferred && <Badge tone="guessed">Owner is a guess</Badge>}
                 <Badge tone={priorityTone[t.priority]}>{t.priority}</Badge>
-                {t.due &&
-                  (t.onCalendar ? (
-                    <Badge tone="done">
-                      <CalendarCheck className="size-3" aria-hidden />
-                      On your calendar
-                    </Badge>
-                  ) : (
-                    <Button size="sm" variant="ghost" onClick={() => addOne(t.id)}>
-                      <CalendarPlus className="size-4" aria-hidden />
-                      Save the date
-                    </Button>
-                  ))}
+                {t.due && (
+                  <Button size="sm" variant="ghost" onClick={() => saveOne(t)}>
+                    <CalendarPlus className="size-4" aria-hidden />
+                    Save the date
+                  </Button>
+                )}
               </div>
             </li>
           );

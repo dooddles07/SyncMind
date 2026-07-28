@@ -36,7 +36,7 @@ export function Steps() {
     {
       icon: Mail,
       title: "Send the follow-up",
-      body: "The recap email is already written in your voice. Check it, hit the button, and it lands in your Gmail drafts ready to send.",
+      body: "The recap email is already written in your voice. Check it, hit the button, and it opens in your own Gmail with every word filled in.",
     },
   ];
 
@@ -89,12 +89,12 @@ export function WhatYouGet() {
     {
       icon: CalendarPlus,
       title: "Deadlines on your calendar",
-      body: "One click adds every dated to-do to Google Calendar.",
+      body: "One click gives you every dated to-do as a calendar file. Works with Google, Outlook and Apple.",
     },
     {
       icon: Mail,
       title: "A follow-up already written",
-      body: "Pick the tone, edit anything, and it goes to your Gmail drafts. SyncMind never sends it for you.",
+      body: "Pick the tone, edit anything, then open it in your own Gmail. SyncMind never sends it for you, and never could.",
       span: "md:col-span-2",
     },
     {
@@ -148,8 +148,8 @@ export function Privacy() {
     },
     {
       icon: ShieldCheck,
-      title: "SyncMind cannot send email as you",
-      body: "It only has permission to create drafts. Even if something went badly wrong, it is not technically able to send a message on your behalf.",
+      title: "SyncMind cannot touch your email or calendar",
+      body: "It never asks for access to either. The follow-up opens in your own Gmail and the dates arrive as a file you open yourself, so there is nothing for it to get wrong.",
     },
     {
       icon: Github,
@@ -210,7 +210,7 @@ export function Faq() {
     },
     {
       q: "Will it send emails without me?",
-      a: "It cannot. SyncMind only has permission to create a draft in your Gmail. You open it, read it, and press send yourself.",
+      a: "It cannot. SyncMind holds no access to your mailbox at all. It hands the finished text to your own Gmail in a new message, and you press send yourself.",
     },
     {
       q: "What does it cost?",

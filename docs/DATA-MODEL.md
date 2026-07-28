@@ -7,7 +7,6 @@ Postgres on Supabase. Every table carries `user_id` and is protected by Row Leve
 ```mermaid
 erDiagram
     profiles ||--o{ meetings : owns
-    profiles ||--o| google_connections : has
     profiles ||--o{ usage_daily : accrues
     meetings ||--o{ audio_chunks : "split into"
     meetings ||--o{ transcript_segments : produces
@@ -201,7 +200,6 @@ create table action_items (
   source_segment_id bigint references transcript_segments(id) on delete set null,
   ai_generated  boolean not null default true,
   edited_by_user boolean not null default false,
-  google_event_id text,                 -- non-null once pushed to Calendar
   position      integer not null default 0,   -- kanban ordering
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
@@ -213,7 +211,9 @@ create index action_items_due_idx on action_items (user_id, due_date)
 create index action_items_meeting_idx on action_items (meeting_id);
 ```
 
-`google_event_id` being non-null is what prevents double-creating a calendar event.
+Calendar delivery is a client-generated `.ics` download (`lib/export/ics.ts`), not a
+Calendar API call, so there is no server-side event id to track and no double-create
+to prevent — downloading the same to-do twice just re-downloads the same file.
 
 ### email_drafts
 
@@ -225,13 +225,14 @@ create table email_drafts (
   body_md         text not null,
   tone            email_tone not null default 'professional',
   recipients      jsonb not null default '[]',   -- [str] email addresses
-  gmail_draft_id  text,
-  gmail_created_at timestamptz,
   edited_by_user  boolean not null default false,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
 ```
+
+No `gmail_draft_id` — the composer builds a Gmail deep link client-side
+(`lib/export/gmail.ts`) from these columns, it does not call the Gmail API.
 
 ### share_links
 
@@ -250,18 +251,10 @@ create table share_links (
 create index share_links_meeting_idx on share_links (meeting_id);
 ```
 
-### google_connections
-
-```sql
-create table google_connections (
-  user_id           uuid primary key references profiles(id) on delete cascade,
-  refresh_token_enc text not null,      -- AES-256-GCM, key from GOOGLE_TOKEN_ENC_KEY
-  scopes            text[] not null,
-  google_email      text,
-  connected_at      timestamptz not null default now(),
-  last_used_at      timestamptz
-);
-```
+No `google_connections` table. SyncMind never holds a Google access or refresh
+token — sign-in is Supabase Auth's own OAuth flow, and Gmail/Calendar are reached
+through a compose link and a downloaded file, not an authenticated API call. See
+`SECURITY-PRIVACY.md` §4.
 
 Access tokens are never stored — they are exchanged per request and held in memory only.
 
@@ -320,7 +313,6 @@ alter table summaries           enable row level security;
 alter table action_items        enable row level security;
 alter table email_drafts        enable row level security;
 alter table share_links         enable row level security;
-alter table google_connections  enable row level security;
 alter table ask_queries         enable row level security;
 alter table usage_daily         enable row level security;
 ```
@@ -333,7 +325,7 @@ create policy "own profile" on profiles
 
 -- Repeat this shape for: meetings, audio_chunks, transcript_segments,
 -- summaries, action_items, email_drafts, share_links,
--- google_connections, ask_queries, usage_daily.
+-- ask_queries, usage_daily.
 create policy "own rows" on meetings
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 ```
@@ -341,7 +333,6 @@ create policy "own rows" on meetings
 Notes:
 
 - Every child table stores `user_id` directly rather than joining through `meetings`. It costs one column and removes a subquery from every policy check.
-- `google_connections.refresh_token_enc` is additionally encrypted at rest by the application, so a policy mistake does not leak a usable token.
 - **The public share page does not use the anon key.** It runs server-side with the service-role client, which bypasses RLS, and is scoped by an explicit query: look up the token, verify `revoked_at is null` and `expires_at` is future, then read only that `meeting_id`. Nothing else is reachable.
 - Service role is used in exactly three places: the share page, `/api/cron/*`, and the pipeline's storage reads. Every other server path uses the request-scoped user client so RLS still applies.
 
@@ -393,7 +384,7 @@ Numbered SQL files under `supabase/migrations/`, applied with the Supabase CLI. 
 0003_meetings_and_chunks.sql
 0004_transcripts.sql
 0005_summaries_actions_email.sql
-0006_share_google_ask_usage.sql
+0006_share_ask_usage.sql
 0007_rls_policies.sql
 0008_storage_bucket_and_policies.sql
 ```

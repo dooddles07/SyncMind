@@ -9,12 +9,14 @@ Everything here is free. No payment method is required at any step.
 | GitHub | github.com | Free | Repo `dooddles07/SyncMind` — **must stay public**, Actions for cron |
 | Supabase | supabase.com | Free | Postgres 500 MB, Auth, Storage 1 GB, 50k MAU |
 | Groq | console.groq.com | Free | Whisper ASR + Llama LLM, rate-limited |
-| Google Cloud | console.cloud.google.com | Free | Gmail + Calendar APIs, OAuth |
+| Google Cloud | console.cloud.google.com | Free | OAuth client for sign-in only — no Gmail/Calendar API |
 | Vercel | vercel.com | Hobby | Hosting, 100 GB bandwidth, 60s functions |
 | Google AI Studio | aistudio.google.com | Free | Gemini fallback key |
 | Sentry (optional) | sentry.io | Developer | 5k errors/month |
 
-Known ceilings to respect: Vercel Hobby is non-commercial and caps functions at 60s, 100 GB bandwidth/month, 100 build minutes/month. Supabase pauses a project after 7 days of no activity and caps free accounts at 2 active projects. Groq free tier is rate-limited per day and per model and caps audio uploads at 25 MB per request — confirm exact per-model numbers at `console.groq.com` before tuning quotas (see AI-PIPELINE §7). Google OAuth in Testing mode allows at most 100 test users. GitHub Actions minutes are free and unlimited only while the repo stays **public**.
+Known ceilings to respect: Vercel Hobby is non-commercial and caps functions at 60s, 100 GB bandwidth/month, 100 build minutes/month. Supabase pauses a project after 7 days of no activity and caps free accounts at 2 active projects. Groq free tier is rate-limited per day and per model and caps audio uploads at 25 MB per request — confirm exact per-model numbers at `console.groq.com` before tuning quotas (see AI-PIPELINE §7). GitHub Actions minutes are free and unlimited only while the repo stays **public**.
+
+No Google OAuth consent-screen verification is needed: sign-in requests only `email`/`profile`, which are unrestricted scopes and ship straight to Production with no review and no user cap. `gmail.compose` and `calendar.events` are not requested at all — see §5.
 
 ## 2. Environment variables
 
@@ -29,7 +31,6 @@ Copy `.env.example` to `.env.local` for local work; set the same keys in Vercel 
 | `GEMINI_API_KEY` | aistudio.google.com → Get API key | **server only** |
 | `GOOGLE_CLIENT_ID` | Cloud Console → Credentials → OAuth client | server |
 | `GOOGLE_CLIENT_SECRET` | same | **server only** |
-| `GOOGLE_TOKEN_ENC_KEY` | `openssl rand -base64 32` | **server only** |
 | `CRON_SECRET` | `openssl rand -hex 32` | **server only** |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` / your Vercel URL | client |
 | `GROQ_DAILY_AUDIO_SECONDS` | default `21600` | server |
@@ -76,29 +77,28 @@ curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_AP
 
 The response must list `whisper-large-v3-turbo` and `llama-3.3-70b-versatile`. If a model id is missing, update `lib/ai/models.ts` rather than working around it at call sites.
 
-## 5. Google Cloud (Gmail + Calendar)
+## 5. Google Cloud (sign-in only)
+
+No Gmail API, no Calendar API, no restricted or sensitive scopes. Follow-up emails
+use a Gmail compose deep link (`mail.google.com/mail/?view=cm`); calendar entries are
+a downloadable `.ics` file. Neither touches a Google API, so neither needs this section.
+See `docs/GAP-ANALYSIS.md` P0.1 for why that path was dropped.
 
 1. Create a project named `SyncMind`.
-2. APIs & Services → Library → enable **Gmail API** and **Google Calendar API**.
-3. OAuth consent screen → External → Testing.
+2. OAuth consent screen → External. **Publish to Production** — the scopes below are
+   unrestricted, so this needs no Google review and has no user cap.
    - App name `SyncMind`, support email, developer email.
-   - Add your own account and any early testers under Test users. Cap is 100.
-4. Scopes — request exactly these, nothing more:
+3. Scopes — request exactly these, nothing more:
 
 ```
 openid
 https://www.googleapis.com/auth/userinfo.email
 https://www.googleapis.com/auth/userinfo.profile
-https://www.googleapis.com/auth/gmail.compose      # create drafts only, cannot send
-https://www.googleapis.com/auth/calendar.events    # create/read events, not the whole calendar
 ```
 
-`gmail.compose` is chosen deliberately over `gmail.send`. The application is technically incapable of sending mail, which is the guarantee the product copy makes.
-
-5. Credentials → Create OAuth client ID → Web application.
+4. Credentials → Create OAuth client ID → Web application.
    - Authorized JavaScript origins: `http://localhost:3000`, `https://<your-app>.vercel.app`
-   - Authorized redirect URIs: the Supabase callback URL, plus `http://localhost:3000/api/google/callback` and `https://<your-app>.vercel.app/api/google/callback`
-6. Sign-in and API access use **incremental consent**: sign-in requests only the identity scopes; Gmail and Calendar scopes are requested later, when the user first clicks a feature that needs them.
+   - Authorized redirect URIs: the Supabase callback URL only.
 
 ## 6. Local development
 
@@ -179,8 +179,8 @@ Check monthly. The single most likely way to leave the free tier is proxying aud
 - [ ] Google sign-in completes and a `profiles` row is created
 - [ ] Upload a 2-minute fixture; it reaches `ready`
 - [ ] Transcript timestamps seek the audio correctly
-- [ ] Gmail draft is created; Gmail Sent is empty
-- [ ] Calendar event lands on the correct date
+- [ ] "Open this in Gmail" opens a filled-in compose window; Gmail Sent stays empty
+- [ ] Downloaded `.ics` event lands on the correct date when opened in a calendar app
 - [ ] A second account gets 404 on the first account's meeting URL
 - [ ] Share link works signed-out; revoke returns 404
 - [ ] Both keep-alive and sweep workflows run green when triggered manually

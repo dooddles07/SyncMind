@@ -4,7 +4,7 @@
 
 SyncMind is an AI meeting assistant. Upload a meeting recording and get back a clean transcript, structured minutes, extracted action items, a ready-to-send follow-up email, and calendar entries for every deadline. Post-meeting admin drops from ~20 minutes to under 2.
 
-Built to run entirely on free tiers: Next.js on Vercel, Supabase for data and auth, Groq for transcription and reasoning, Google APIs for calendar and mail.
+Built to run entirely on free tiers: Next.js on Vercel, Supabase for data and auth, Groq for transcription and reasoning. Email and calendar are a Gmail compose link and a downloadable `.ics` file — no Google API, no OAuth beyond sign-in.
 
 ## Status
 
@@ -26,7 +26,7 @@ Pre-build. Planning documents are complete; no application code exists yet. Star
 
 ## Stack at a glance
 
-Next.js 15 (App Router, TypeScript) · Tailwind CSS v4 · shadcn/ui · Motion · Supabase (Postgres + Auth + Storage) · Groq (`whisper-large-v3-turbo`, `llama-3.3-70b-versatile`) · Google Calendar + Gmail APIs · Vercel Hobby · GitHub Actions
+Next.js 15 (App Router, TypeScript) · Tailwind CSS v4 · shadcn/ui · Motion · Supabase (Postgres + Auth + Storage) · Groq (`whisper-large-v3-turbo`, `llama-3.3-70b-versatile`) · Vercel Hobby · GitHub Actions
 
 Total running cost: **$0**. Every limit and its workaround is documented in `docs/DEPLOYMENT.md`.
 

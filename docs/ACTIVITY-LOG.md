@@ -4,6 +4,41 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — Gap analysis + M4 rebuilt without Google APIs
+
+**Done:** Full-repo gap scan (`docs/GAP-ANALYSIS.md`, new file) against the stated goal
+of a live, $0, portfolio-ready deploy. Six P0 zero-cost-constraint breaks identified;
+fixed the first one end to end.
+
+**Decision: drop `gmail.compose` + `calendar.events` OAuth entirely.**
+
+Reasoning: Google's Testing-mode refresh tokens expire every 7 days, and leaving
+Testing mode for a restricted scope (`gmail.compose`) requires a paid third-party
+security assessment — both incompatible with an always-free, always-on project nobody
+is paid to babysit. Replaced with:
+
+- `lib/export/gmail.ts` — Gmail compose deep link (`mail.google.com/mail/?view=cm`),
+  `mailto:` fallback, plain-text clipboard copy, an over-length guard for Gmail's URL
+  truncation.
+- `lib/export/ics.ts` — hand-rolled RFC 5545 builder (75-octet line folding, `\,;`
+  escaping, all-day `VEVENT`s), single and bulk download.
+
+Wired into `EmailComposer` ("Open this in Gmail" / "Copy it instead") and `TodoTable`
+("Save the date" / "Put all N dates in my calendar"); `Todo.onCalendar` retired since
+there is no server state to track. Settings, marketing copy, and all six docs
+(`PRODUCT-REQUIREMENTS`, `ROADMAP` M4, `ARCHITECTURE`, `DATA-MODEL`, `SECURITY-PRIVACY`,
+`DEPLOYMENT`) updated to match, plus `.env.example` (dropped `GOOGLE_TOKEN_ENC_KEY`,
+no longer needed with no token to encrypt). Verified with Playwright: compose link
+builds correctly, downloaded `.ics` parses as valid RFC 5545, no console errors.
+
+Google sign-in itself is unaffected and unaffected by any of this — `email`/`profile`
+are unrestricted scopes, ship straight to Production, no verification, no user cap.
+
+**Next:** P0.2 (GitHub Actions cron dies after 60 days idle) or P0.4 (`ffmpeg.wasm`
+threading decision) — see `docs/GAP-ANALYSIS.md` for the full list, ordered.
+
+---
+
 ## 2026-07-28 — Planning session
 
 **Done:** Full pre-build documentation set created. No application code written.

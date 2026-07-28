@@ -94,7 +94,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
           />
         </TabsContent>
         <TabsContent value="todos">
-          <TodoTable initial={todos} />
+          <TodoTable initial={todos} meetingTitle={meeting.title} />
         </TabsContent>
         <TabsContent value="email">
           <EmailComposer draft={draft} />

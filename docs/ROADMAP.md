@@ -87,23 +87,28 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 
 ---
 
-## M4 — Google Calendar and Gmail
-**Estimate: 2-3 days**
+## M4 — Email and calendar export (no Google API)
+**Estimate: half a day — shipped ahead of schedule, see below**
 
-| # | Task |
-| --- | --- |
-| 4.1 | Google Cloud project; OAuth consent screen in Testing; enable Gmail + Calendar APIs |
-| 4.2 | Incremental-consent connect flow; `/api/google/connect` and `/callback` |
-| 4.3 | Refresh token encrypted with AES-256-GCM into `google_connections` |
-| 4.4 | Access-token exchange with single-retry refresh on 401 |
-| 4.5 | `gmail.drafts.create` from the composer; return the Gmail deep link. **No send path exists in the codebase.** |
-| 4.6 | `calendar.events.insert` per action item; store `google_event_id`; bulk add |
-| 4.7 | Duplicate prevention and the calendar-linked badge |
-| 4.8 | Disconnect with token revocation |
-| 4.9 | Settings page: connection state, granted scopes, retention slider, usage |
-| 4.10 | Non-allowlisted test user handled with clear copy |
+Originally scoped as Gmail `drafts.create` + Calendar `events.insert` via OAuth. Dropped:
+Testing-mode refresh tokens expire every 7 days, and leaving Testing mode for a
+restricted scope (`gmail.compose`) requires a paid third-party security assessment.
+Neither is compatible with an always-free, always-on portfolio project. See
+`PRODUCT-REQUIREMENTS.md` §10 and `docs/GAP-ANALYSIS.md` P0.1 for the full reasoning.
 
-**Exit:** from a processed meeting, create a real Gmail draft and real Calendar events in under 60 seconds, with no duplicates on repeat clicks.
+| # | Task | Status |
+| --- | --- | --- |
+| 4.1 | `lib/export/gmail.ts` — compose deep link (`mail.google.com/mail/?view=cm`), `mailto:` fallback, plain-text clipboard copy, over-length guard | Done |
+| 4.2 | `lib/export/ics.ts` — RFC 5545 `.ics` builder (line folding, text escaping, all-day events), single and bulk download | Done |
+| 4.3 | `EmailComposer` wired to "Open this in Gmail" / "Copy it instead" | Done |
+| 4.4 | `TodoTable` wired to "Save the date" (single) / "Put all N dates in my calendar" (bulk) | Done |
+| 4.5 | Settings page Google section reworded: no scopes requested beyond sign-in | Done |
+| 4.6 | Marketing copy (hero, sections, FAQ) reworded to match | Done |
+
+**Exit:** from a processed meeting, opening the Email tab and clicking through lands a
+filled-in message in the user's own Gmail; downloading a to-do's date opens correctly in
+Google Calendar, Outlook, and Apple Calendar. Zero Google Cloud project, zero OAuth
+consent screen, zero verification, zero expiry.
 
 ---
 
@@ -123,7 +128,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | 5.9 | Playwright E2E covering the full happy path |
 | 5.10 | Sentry wired; error boundaries with useful recovery |
 | 5.11 | Manual launch checklist (below) |
-| 5.12 | README polish, production deploy, first 5 real users invited to the OAuth allowlist |
+| 5.12 | README polish, production deploy, share the live link |
 
 **Exit:** MVP live. All PRODUCT-REQUIREMENTS MVP features (F1-F15) shipped.
 
@@ -135,8 +140,8 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 - [ ] Real 45-minute recording processes end to end
 - [ ] Poor-audio recording degrades honestly rather than inventing content
 - [ ] The no-clear-actions fixture produces zero action items
-- [ ] Gmail draft appears with correct subject and body; nothing was sent
-- [ ] Calendar events land on correct dates; second click does not duplicate
+- [ ] "Open this in Gmail" opens a compose window with correct subject and body; nothing sends on its own
+- [ ] Downloaded `.ics` opens correctly in Google Calendar, Outlook, and Apple Calendar with the right date
 - [ ] Share link renders for a signed-out visitor; revoke returns 404
 - [ ] A second account cannot reach the first account's meeting by ID
 - [ ] Delete removes the storage objects, verified in the Supabase dashboard
@@ -155,10 +160,10 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | M1 | 3-4 | 6 |
 | M2 | 3-4 | 10 |
 | M3 | 4-5 | 15 |
-| M4 | 2-3 | 18 |
-| M5 | 3-4 | 22 |
+| M4 | 0.5 | 15.5 |
+| M5 | 3-4 | 19.5 |
 
-**~3-4.5 focused weeks to MVP.**
+**~3-4 focused weeks to MVP.**
 
 ---
 
@@ -171,7 +176,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | R3 | 60s Vercel limit exceeded by a slow chunk | Low | High | 10-minute chunks transcribe in 5-20s; if a chunk times out it retries with a 5-minute split |
 | R4 | Supabase pauses after inactivity | Medium | Medium | Keep-alive cron every 3 days from M0 |
 | R5 | Action-item quality below the trust threshold | Medium | High | Eval suite gates every prompt change; precision prioritized over recall; everything editable |
-| R6 | Google OAuth verification blocks growth past 100 users | High | Medium | Expected. Testing mode is fine for MVP. Verification is a Phase-2 task; export-only paths (.ics, copy email) work without any Google connection |
+| R6 | ~~Google OAuth verification blocks growth past 100 users~~ Retired | — | — | M4 dropped OAuth for Gmail/Calendar entirely (see M4 note). Sign-in still uses Google OAuth, but only `email`/`profile` — unrestricted scopes, no verification required, no user cap |
 | R7 | 1 GB storage exhausted | Medium | Medium | 7-day retention enforced by cron from M2; Opus transcode cuts size ~10x versus source |
 | R8 | Hallucinated commitments damage trust | Low | High | Conservative prompt rules, null-owner default, "AI-inferred" badges, past-date nulling, zero-action fixture in the eval set |
 | R9 | Scope creep into Phase 2 during MVP | High | Medium | PRODUCT-REQUIREMENTS §6 is the contract; anything not in F1-F15 is deferred without debate |

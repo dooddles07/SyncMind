@@ -21,8 +21,8 @@ SyncMind takes a recording that already exists — a Zoom/Meet/Teams export, a p
 - A timestamped, speaker-labeled transcript.
 - Structured minutes: summary, topics, decisions, open questions.
 - Action items with owner, due date, and priority.
-- A follow-up email drafted in the user's voice, staged as a Gmail draft.
-- Calendar events for action items with dates.
+- A follow-up email drafted in the user's voice, one click from opening in the user's own Gmail.
+- Calendar events for action items with dates, delivered as a standard `.ics` file.
 
 No bot joins the meeting. No live capture. Upload-and-go, which is what makes it possible to run at zero cost.
 
@@ -77,8 +77,8 @@ Records lectures, interviews, and study group sessions. Wants a searchable trans
 | F6 | AI minutes | Summary paragraph, bulleted key topics, explicit Decisions list, Open Questions list. Each item carries the timestamp it came from. |
 | F7 | Action items | Extracted with title, owner, due date, priority, and source timestamp. Fully editable inline. Add/delete manually. |
 | F8 | Action item board | Cross-meeting kanban: To do / In progress / Done. Filter by owner, meeting, overdue. |
-| F9 | Follow-up email draft | Generated recap email with editable subject and body, plus tone selector (Professional / Friendly / Brief). One click creates a **Gmail draft** — SyncMind never sends. |
-| F10 | Calendar push | For any action item with a due date, one click creates a Google Calendar event (all-day, on the due date, with the action title and a link back to the meeting). Bulk "add all" supported. |
+| F9 | Follow-up email draft | Generated recap email with editable subject and body, plus tone selector (Professional / Friendly / Brief). One click opens a Gmail compose window pre-filled with the text, via `mail.google.com/mail/?view=cm`, plus copy-to-clipboard and a `mailto:` fallback for non-Gmail users. **No Gmail API, no OAuth scope, no send code path — SyncMind cannot send email even in principle.** |
+| F10 | Calendar push | For any action item with a due date, one click downloads a `.ics` file (single event or the full meeting's dated to-dos) that opens directly in Google Calendar, Outlook, or Apple Calendar. **No Calendar API, no OAuth scope.** |
 | F11 | Ask this meeting | A question box over a single meeting's transcript. Answers cite timestamps. |
 | F12 | Export | Download minutes as Markdown or PDF (print stylesheet). Download transcript as .txt or .srt. Download action items as .ics. |
 | F13 | Share link | Generate a read-only public URL for a meeting's minutes + action items (transcript optional). Revocable. Not indexed. |
@@ -121,14 +121,15 @@ Records lectures, interviews, and study group sessions. Wants a searchable trans
 *As Dan, I send a client recap in under a minute.*
 - Given a processed meeting, when I open the Email tab, then a subject and body are already drafted.
 - Given I pick a different tone, when I confirm, then the body regenerates while my manual edits are warned about first.
-- Given I click "Create Gmail draft", then the draft appears in my Gmail Drafts folder and SyncMind confirms with a direct link.
-- SyncMind must never call `messages.send`. Draft creation only.
+- Given I click "Open this in Gmail", then a new Gmail compose tab opens with the recipients, subject, and body already filled in, and I press send myself.
+- Given the drafted email is too long for a compose URL, then the button is replaced by a "Copy the whole thing" action instead of silently truncating.
+- SyncMind holds no Gmail scope and has no code path capable of sending mail.
 
 **US-4 — Nothing gets dropped**
 *As Maya, deadlines land on my calendar.*
-- Given action items with due dates, when I click "Add all to calendar", then one event per item is created on the correct date.
-- Given an event is created, when I view the action item, then it shows a calendar-linked badge and will not double-create.
-- Given I have not connected Google Calendar, when I click add, then I am prompted to connect, and the action resumes afterwards.
+- Given action items with due dates, when I click "Put all dates in my calendar", then a single `.ics` file downloads with one event per dated action item.
+- Given a single action item, when I click "Save the date", then a one-event `.ics` file downloads for just that item.
+- Opening the file in Google Calendar, Outlook, or Apple Calendar adds the event; SyncMind never talks to a calendar API directly, so there is no account to connect first.
 
 **US-5 — Find things later**
 *As Priya, I find what was said without re-listening.*
@@ -152,9 +153,9 @@ Landing → Sign in with Google → Dashboard (empty state)
         ├─ Minutes tab: summary, topics, decisions, open questions   [edit]
         ├─ Transcript tab: player + timestamped segments + search
         ├─ Actions tab: action item table                            [edit]
-        ├─ Email tab: draft + tone → Create Gmail draft
+        ├─ Email tab: draft + tone → Open this in Gmail
         └─ Ask tab: question box with cited answers
-   → Add all due dates to Google Calendar
+   → Download all due dates as .ics
    → Export Markdown / PDF, or generate share link
    → Dashboard → Action Items board tracks everything across meetings
 ```
@@ -177,4 +178,4 @@ These are not implementation details; they define what the product can promise.
 - **Free-tier transcription** means a daily ceiling on audio minutes. The UI must surface remaining quota and degrade honestly ("Transcription capacity reached for today — queued for tomorrow") rather than failing silently.
 - **Serverless execution limits** mean processing is staged and resumable, not one long request. This is why status is a database field, not an in-memory promise.
 - **Storage is 1 GB.** Audio is deleted automatically 7 days after processing unless the user pins the meeting. This is a stated product policy, not a hidden cleanup job.
-- **Google OAuth in Testing mode** caps the app at 100 authorized test users until verification. Onboarding must handle "your account is not on the allowlist" gracefully.
+- **No Gmail or Calendar API integration, by design, not by omission.** Google's restricted-scope (`gmail.compose`) and sensitive-scope (`calendar.events`) verification requires a paid third-party security assessment to leave Testing mode, and Testing-mode refresh tokens expire every 7 days — incompatible with an always-free, always-on product. Email and calendar features are delivered as a Gmail compose deep link and a downloadable `.ics` file instead: zero API surface, nothing to verify, nothing that expires. Google sign-in (`email`/`profile` scopes only) is unaffected and ships in Production mode.
