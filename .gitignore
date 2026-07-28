@@ -21,6 +21,7 @@ test-results/
 playwright-report/
 blob-report/
 .playwright/
+.playwright-mcp/
 
 # vercel / turbo
 .vercel
