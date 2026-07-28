@@ -1,0 +1,233 @@
+@import "tailwindcss";
+
+/* next-themes sets a class on <html>, so dark has to be a class variant not a media query */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  Room Tone palette. Two colours carry the product story:
+    said  = amber, anything a human spoke (audio, waveform, timecodes, quotes)
+    done  = teal, anything SyncMind produced from it (notes, to-dos, calendar)
+  guessed = lilac, AI-inferred and unconfirmed. The honesty channel.
+  The *-text variants are darkened so the signal colours clear WCAG AA as text.
+*/
+:root {
+  --background: oklch(0.975 0.004 160);
+  --foreground: oklch(0.2 0.015 165);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.015 165);
+  --muted: oklch(0.945 0.005 165);
+  --muted-foreground: oklch(0.5 0.012 165);
+  --border: oklch(0.9 0.006 165);
+  --input: oklch(0.88 0.007 165);
+
+  --said: oklch(0.7 0.16 65);
+  --said-text: oklch(0.5 0.13 55);
+  --said-soft: oklch(0.96 0.03 75);
+
+  --done: oklch(0.55 0.1 178);
+  --done-foreground: oklch(0.99 0.004 160);
+  --done-text: oklch(0.47 0.09 180);
+  --done-soft: oklch(0.95 0.03 180);
+
+  --guessed: oklch(0.6 0.1 295);
+  --guessed-text: oklch(0.52 0.13 295);
+  --guessed-soft: oklch(0.96 0.02 295);
+
+  --overdue: oklch(0.57 0.19 27);
+  --overdue-text: oklch(0.52 0.19 27);
+  --overdue-soft: oklch(0.96 0.02 27);
+
+  --ring: oklch(0.55 0.1 178);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+
+  --shadow-sm: 0 1px 2px oklch(0.2 0.015 165 / 0.06);
+  --shadow-md: 0 6px 20px oklch(0.2 0.015 165 / 0.08);
+  --shadow-lg: 0 18px 48px oklch(0.2 0.015 165 / 0.12);
+}
+
+.dark {
+  --background: oklch(0.16 0.012 165);
+  --foreground: oklch(0.96 0.005 160);
+  --card: oklch(0.21 0.014 165);
+  --card-foreground: oklch(0.96 0.005 160);
+  --muted: oklch(0.25 0.013 165);
+  --muted-foreground: oklch(0.68 0.01 160);
+  --border: oklch(0.29 0.013 165);
+  --input: oklch(0.33 0.014 165);
+
+  --said: oklch(0.78 0.15 68);
+  --said-text: oklch(0.8 0.14 70);
+  --said-soft: oklch(0.28 0.05 65);
+
+  --done: oklch(0.74 0.11 178);
+  --done-foreground: oklch(0.16 0.012 165);
+  --done-text: oklch(0.78 0.11 178);
+  --done-soft: oklch(0.27 0.04 178);
+
+  --guessed: oklch(0.76 0.09 295);
+  --guessed-text: oklch(0.78 0.09 295);
+  --guessed-soft: oklch(0.28 0.04 295);
+
+  --overdue: oklch(0.68 0.17 27);
+  --overdue-text: oklch(0.72 0.16 27);
+  --overdue-soft: oklch(0.28 0.06 27);
+
+  --ring: oklch(0.74 0.11 178);
+
+  /* shadows do not read on dark surfaces, the border carries elevation instead */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-said: var(--said);
+  --color-said-text: var(--said-text);
+  --color-said-soft: var(--said-soft);
+
+  --color-done: var(--done);
+  --color-done-foreground: var(--done-foreground);
+  --color-done-text: var(--done-text);
+  --color-done-soft: var(--done-soft);
+
+  --color-guessed: var(--guessed);
+  --color-guessed-text: var(--guessed-text);
+  --color-guessed-soft: var(--guessed-soft);
+
+  --color-overdue: var(--overdue);
+  --color-overdue-text: var(--overdue-text);
+  --color-overdue-soft: var(--overdue-soft);
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* the focus ring is never removed, only restyled */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: var(--said-soft);
+    color: var(--foreground);
+  }
+}
+
+@utility text-display {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5vw, 4.25rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+}
+
+@utility text-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(1.875rem, 3.2vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+}
+
+@utility text-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 2.2vw, 1.75rem);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+}
+
+@utility text-h3 {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+/* timecodes must not shift layout as the digits change */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+@keyframes acc-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes acc-up {
+  from {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
