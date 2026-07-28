@@ -40,6 +40,10 @@ Verified: `tsc --noEmit` clean, `next build` clean (4 static routes), gallery re
 
 Second increment, also verified: `components/ui/input.tsx` (Input, Textarea, and a `Field` wrapper that ties label, control and error together with `aria-describedby`) · `components/ui/progress.tsx` · `components/ui/avatar.tsx` (Avatar and Separator). Gallery extended with all three. `tsc` and `next build` clean; confirmed `aria-describedby`, `role="progressbar"`, `aria-valuenow`, `aria-invalid` and the error-to-field id link all render.
 
+Third increment, also verified: `lib/mock/data.ts` (meetings, speakers, transcript, minutes, action items, email draft, ask history, usage — plus async query seams matching the eventual real signatures) · `components/meeting/speaker-chip.tsx`. Gallery extended.
+
+`lib/mock/data.ts` is the unblocker for everything else — every remaining product component and all 8 routes read from it. Fixtures deliberately include the awkward cases: an overdue item, two AI-inferred items, a purged-audio meeting, a failed meeting with partials preserved, and the verbatim no-answer response.
+
 **Still to build in Phase 2 — 11 primitives:** Select · Checkbox · Switch · Dialog · Sheet · DropdownMenu · Tabs · Tooltip · Toast (sonner) · AlertDialog · Command.
 
 **Still to build — 12 product components:** Dropzone · ChunkProgress · AudioPlayer · TranscriptList · SpeakerChip · MinutesEditor · ActionTable · EmailComposer · AskPanel · KanbanBoard · QuotaBanner.

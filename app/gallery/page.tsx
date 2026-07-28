@@ -9,6 +9,8 @@ import { Input, Textarea, Field } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, Separator } from "@/components/ui/avatar";
 import { StatusStepper } from "@/components/meeting/status-stepper";
+import { SpeakerChip } from "@/components/meeting/speaker-chip";
+import { SPEAKERS } from "@/lib/mock/data";
 import type { MeetingStatus } from "@/lib/types";
 
 // Phase 2 exit criterion: every component in every state, both modes.
@@ -231,6 +233,17 @@ export default function GalleryPage() {
                 <StatusStepper status={status} stageDetail={detail} />
               </div>
             </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section
+        title="SpeakerChip"
+        note="AI-derived names keep an amber dot AND the words AI-inferred until a person confirms or renames. The dot alone would not survive greyscale; the words alone are easy to miss at this size."
+      >
+        <div className="flex flex-wrap gap-3">
+          {SPEAKERS.map((s) => (
+            <SpeakerChip key={s.id} speaker={s} />
           ))}
         </div>
       </Section>
