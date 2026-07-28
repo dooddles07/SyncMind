@@ -122,8 +122,8 @@ Ordered as a build sequence; each item is a real dependency of the next.
 | 2.1 | ~~`npm run lint` is broken~~ **Resolved** | `eslint@9` + `eslint-config-next@15.5.22` (matches installed Next exactly) installed, flat config at `eslint.config.mjs` using `FlatCompat` to bridge `next/core-web-vitals` + `next/typescript`. `npm run lint` now runs `eslint .` and passes clean. |
 | 2.2 | ~~No CI~~ **Resolved** | `.github/workflows/ci.yml`: typecheck + lint + build on every push/PR, all three green. Unit step still waits on 2.9 (no test runner). |
 | 2.3 | `keepalive.yml` **done** / `sweep.yml` still missing | See P0.2/P0.3. `sweep.yml` needs the pipeline state machine (P1/M2), not built yet. |
-| 2.4 | No error/not-found UI | Missing `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`, `app/loading.tsx`. A thrown error today shows the raw Next.js default. |
-| 2.5 | No OG image, no `robots.ts`, no `sitemap.ts`, no `manifest.ts` | For a portfolio link this is the highest-visibility gap on the list. Pasting the URL into LinkedIn/X/Discord currently previews as a bare title. `opengraph-image.tsx` with `next/og` is free and static. |
+| 2.4 | ~~No error/not-found UI~~ **Resolved** | `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`, `app/loading.tsx` all added, all reuse `EmptyState` for visual consistency (`global-error.tsx` excepted — it replaces `<html>`/`<body>` itself, so it's plain inline styles by necessity). Verified in browser via Playwright. |
+| 2.5 | ~~No OG image, no `robots.ts`, no `sitemap.ts`~~ **Resolved** | `app/opengraph-image.tsx` (`next/og`, brand mark + tagline, verified rendering in browser), `app/robots.ts`, `app/sitemap.ts` all added. Along the way, fixed a real bug the build surfaced: `metadataBase` wasn't set in `app/layout.tsx`, so the OG image's URL would have resolved to `localhost` in production — the feature would have silently done nothing on the live site. No `manifest.ts` — that's PWA/installability, out of scope for this pair. |
 | 2.6 | ~~No Vercel project connected~~ **Already done** | Discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/) since before this scan started. |
 | 2.7 | ~~README is wrong on its own front page~~ **Resolved** | Status section now states the real, live state (deployed at sync-mind-three.vercel.app, UI on fixtures, no backend) with the live URL linked. Dead `DESIGN-SYSTEM.md` link repointed to `app/globals.css`. Quickstart ungated — works today, doesn't need M0 to "land" since it substantially already has. |
 | 2.8 | ~~`ROADMAP.md` still references the deleted DESIGN-SYSTEM doc~~ **Resolved** | M0.4 and M1.2 (the only two actual references — M5 turned out not to have one) repointed to `app/globals.css` and marked done. |
@@ -167,6 +167,6 @@ Nothing in the recommended stack requires a payment method at any step.
 1. ~~P0 decisions~~ **All done** — P0.1 (OAuth drop), P0.2 (keepalive heartbeat), P0.3 (mechanism live, nothing to keep alive yet), P0.4 (ffmpeg threading locked), P0.5 (real Groq limits confirmed, map-reduce threshold corrected) all shipped 2026-07-28.
 2. ~~P2.6 connect Vercel~~ **Already done**, discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/).
 3. ~~P2.1, P2.2, P2.6, P2.7, P2.8~~ **All done.** Every "fix what's wrong" P2 item is closed — what's left is genuinely new build work.
-4. P2.5 OG image + error pages — the demo now looks finished when shared, and it already has a real URL to share.
-5. P1.1 → P1.13 in order — the real build, M1 through M3.
+4. ~~P2.4, P2.5~~ **Done** — error/not-found UI and OG image/robots/sitemap shipped. The demo now looks finished when shared, and it already has a real URL to share.
+5. P1.1 → P1.13 in order — the real build, M1 through M3. Remaining P2 (2.9 tests, 2.10 monitoring) can slot in alongside or after — neither blocks the other.
 6. P3.

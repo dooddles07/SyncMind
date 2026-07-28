@@ -5,7 +5,13 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
+// Without this, Next resolves relative metadata URLs (like the auto-detected
+// app/opengraph-image.tsx) against http://localhost:3000, so the og:image tag on the
+// live site would point at localhost instead of the deployed URL.
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://sync-mind-three.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(APP_URL),
   title: {
     default: "SyncMind — Turn any meeting recording into notes you can send",
     template: "%s · SyncMind",

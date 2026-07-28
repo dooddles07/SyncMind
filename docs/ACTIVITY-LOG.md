@@ -4,6 +4,53 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — Error/not-found UI + OG image, robots, sitemap
+
+**Done:** P2.4 + P2.5 from `docs/GAP-ANALYSIS.md`.
+
+- `app/not-found.tsx`, `app/error.tsx`, `app/loading.tsx` — all reuse
+  `components/ui/empty-state.tsx` for visual consistency with the rest of the app,
+  wrapped in a self-contained shell since they render outside the `(app)` layout's
+  sidebar. `error.tsx` is a Client Component per Next's requirement, logs the caught
+  error (bare error only, no transcript/user content, per `SECURITY-PRIVACY.md` §6).
+- `app/global-error.tsx` — the outermost fallback, replaces `<html>`/`<body>` itself
+  when the root layout crashes, so it can't use Tailwind (the thing that crashed) —
+  plain inline styles, on-brand colors hardcoded.
+- `app/opengraph-image.tsx` — `next/og`'s `ImageResponse`, 1200×630. Recreates the
+  brand mark (`components/brand.tsx`'s `Mark`) as inline SVG paths rather than
+  importing the React component, since Satori's JSX-to-image renderer isn't guaranteed
+  to handle arbitrary component imports. Colors as static hex (Satori can't read CSS
+  custom properties or `oklch()`) — reused the same conversion `app/icon.svg` already
+  did.
+- `app/robots.ts`, `app/sitemap.ts` — allow everything except `/share/*` and `/api/*`;
+  sitemap lists only `/` for now, since everything else sits behind auth that doesn't
+  exist yet and is private data once it does.
+
+**Real bug found via the build, not by inspection:** `next build` warned
+`metadataBase property in metadata export is not set` — without it, Next resolves the
+auto-detected `opengraph-image.tsx`'s URL against `http://localhost:3000`, so the
+`og:image` tag on the live site would have pointed at localhost. The feature would
+have built cleanly, looked correct in every local check, and simply not worked when
+anyone actually pasted the live link anywhere. Fixed by adding `metadataBase` to
+`app/layout.tsx`'s metadata export, sourced from `NEXT_PUBLIC_APP_URL` with a fallback
+to the known live URL. Rebuilt to confirm the warning is gone.
+
+**Also hit and fixed:** a stale `.next` build cache from switching between `next build`
+and `next dev` in the same session caused a false-positive 500 on `/does-not-exist`
+(`ENOENT` on a vendor chunk) — cleared `.next`, restarted, confirmed 404 with the
+custom page rendering correctly. Not a code issue.
+
+Verified end to end with Playwright: `/does-not-exist` renders the custom not-found
+page (correct 404 status), `/opengraph-image` renders the branded PNG correctly,
+`/robots.txt` and `/sitemap.xml` both resolve. `npm run typecheck`, `npm run lint`,
+`npm run build` all green.
+
+**Next:** every "fix what's wrong" and "look right when shared" P2 item is done.
+What's left in P2 is test coverage (2.9) and error monitoring (2.10) — otherwise it's
+P1, the actual backend.
+
+---
+
 ## 2026-07-28 — README fixed: no longer lies about its own status
 
 **Done:** P2.7/P2.8 from `docs/GAP-ANALYSIS.md`. The README's Status section said
