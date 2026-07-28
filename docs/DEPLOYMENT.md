@@ -1,0 +1,187 @@
+# SyncMind — Setup and Deployment
+
+Everything here is free. No payment method is required at any step.
+
+## 1. Accounts
+
+| Service | URL | Plan | What it gives us |
+| --- | --- | --- | --- |
+| GitHub | github.com | Free | Repo `dooddles07/SyncMind`, Actions for cron |
+| Supabase | supabase.com | Free | Postgres 500 MB, Auth, Storage 1 GB, 50k MAU |
+| Groq | console.groq.com | Free | Whisper ASR + Llama LLM, rate-limited |
+| Google Cloud | console.cloud.google.com | Free | Gmail + Calendar APIs, OAuth |
+| Vercel | vercel.com | Hobby | Hosting, 100 GB bandwidth, 60s functions |
+| Google AI Studio | aistudio.google.com | Free | Gemini fallback key |
+| Sentry (optional) | sentry.io | Developer | 5k errors/month |
+
+Known ceilings to respect: Vercel Hobby is non-commercial and caps functions at 60s. Supabase pauses a project after 7 days of no activity. Groq free tier is rate-limited per day and caps audio uploads at 25 MB per request. Google OAuth in Testing mode allows at most 100 test users.
+
+## 2. Environment variables
+
+Copy `.env.example` to `.env.local` for local work; set the same keys in Vercel for Preview and Production.
+
+| Variable | Where to get it | Exposure |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL | client |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public | client |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → service_role | **server only** |
+| `GROQ_API_KEY` | console.groq.com → API Keys | **server only** |
+| `GEMINI_API_KEY` | aistudio.google.com → Get API key | **server only** |
+| `GOOGLE_CLIENT_ID` | Cloud Console → Credentials → OAuth client | server |
+| `GOOGLE_CLIENT_SECRET` | same | **server only** |
+| `GOOGLE_TOKEN_ENC_KEY` | `openssl rand -base64 32` | **server only** |
+| `CRON_SECRET` | `openssl rand -hex 32` | **server only** |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` / your Vercel URL | client |
+| `GROQ_DAILY_AUDIO_SECONDS` | default `21600` | server |
+| `GROQ_DAILY_ASR_CALLS` | default `60` | server |
+| `GROQ_DAILY_LLM_CALLS` | default `80` | server |
+| `GROQ_DAILY_LLM_TOKENS` | default `400000` | server |
+| `SENTRY_DSN` | Sentry project settings (optional) | server |
+
+Only `NEXT_PUBLIC_*` variables may appear in client code. A server-only key referenced from a `"use client"` file is a shipped secret — CI greps for this and fails the build.
+
+## 3. Supabase
+
+1. New project. Pick the region closest to your users. Save the database password.
+2. Install the CLI: `npm i -g supabase`. Then `supabase login` and `supabase link --project-ref <ref>`.
+3. Apply migrations:
+
+```bash
+supabase db push
+```
+
+4. Create the `recordings` bucket as **private** (Storage → New bucket), then apply the storage policies from DATA-MODEL §5.
+5. Verify RLS is enabled on every table: Database → Tables → each table shows "RLS enabled". A table without it is a data leak.
+6. Generate types after every migration:
+
+```bash
+supabase gen types typescript --linked > lib/supabase/types.ts
+```
+
+### Google sign-in
+
+Authentication → Providers → Google → enable. Paste `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (from §5). Copy the callback URL Supabase shows — it goes into the Google credential's authorized redirect URIs.
+
+Authentication → URL Configuration → Site URL = your production URL. Add `http://localhost:3000/**` and your Vercel preview pattern to Redirect URLs.
+
+## 4. Groq
+
+console.groq.com → API Keys → Create. Copy immediately; it is shown once.
+
+Verify:
+
+```bash
+curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"
+```
+
+The response must list `whisper-large-v3-turbo` and `llama-3.3-70b-versatile`. If a model id is missing, update `lib/ai/models.ts` rather than working around it at call sites.
+
+## 5. Google Cloud (Gmail + Calendar)
+
+1. Create a project named `SyncMind`.
+2. APIs & Services → Library → enable **Gmail API** and **Google Calendar API**.
+3. OAuth consent screen → External → Testing.
+   - App name `SyncMind`, support email, developer email.
+   - Add your own account and any early testers under Test users. Cap is 100.
+4. Scopes — request exactly these, nothing more:
+
+```
+openid
+https://www.googleapis.com/auth/userinfo.email
+https://www.googleapis.com/auth/userinfo.profile
+https://www.googleapis.com/auth/gmail.compose      # create drafts only, cannot send
+https://www.googleapis.com/auth/calendar.events    # create/read events, not the whole calendar
+```
+
+`gmail.compose` is chosen deliberately over `gmail.send`. The application is technically incapable of sending mail, which is the guarantee the product copy makes.
+
+5. Credentials → Create OAuth client ID → Web application.
+   - Authorized JavaScript origins: `http://localhost:3000`, `https://<your-app>.vercel.app`
+   - Authorized redirect URIs: the Supabase callback URL, plus `http://localhost:3000/api/google/callback` and `https://<your-app>.vercel.app/api/google/callback`
+6. Sign-in and API access use **incremental consent**: sign-in requests only the identity scopes; Gmail and Calendar scopes are requested later, when the user first clicks a feature that needs them.
+
+## 6. Local development
+
+```bash
+git clone https://github.com/dooddles07/SyncMind.git && cd SyncMind && npm install && cp .env.example .env.local
+```
+
+Fill `.env.local`, then:
+
+```bash
+npm run dev
+```
+
+Scripts:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | dev server on :3000 |
+| `npm run build` | production build; must pass before pushing |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest unit + integration |
+| `npm run test:e2e` | Playwright |
+| `npm run eval` | AI quality eval against fixtures |
+| `npm run db:types` | regenerate Supabase types |
+
+`ffmpeg.wasm` requires cross-origin isolation. `next.config.ts` sets `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. If audio processing silently fails locally, this header pair is the first thing to check.
+
+## 7. Vercel
+
+1. Import the GitHub repo. Framework preset: Next.js. Defaults are correct.
+2. Settings → Environment Variables → add everything from §2 for Production, Preview, and Development.
+3. Deploy. `main` is production; every PR gets a preview URL.
+4. After the first deploy, set `NEXT_PUBLIC_APP_URL` to the real URL and add it to the Supabase redirect list and the Google authorized origins.
+
+Function configuration in `vercel.json`:
+
+```json
+{
+  "functions": {
+    "app/api/pipeline/advance/route.ts": { "maxDuration": 60 },
+    "app/api/cron/sweep/route.ts":       { "maxDuration": 60 }
+  }
+}
+```
+
+Do not use Vercel Cron — Hobby allows only daily jobs and we need the keep-alive on a 3-day rhythm plus a daily sweep. GitHub Actions handles both and stays free.
+
+## 8. Scheduled jobs
+
+`.github/workflows/keepalive.yml` — every 3 days, `curl` `${{ secrets.APP_URL }}/api/health`. This is what stops Supabase pausing the project.
+
+`.github/workflows/sweep.yml` — daily at 03:00 UTC, POST `/api/cron/sweep` with `Authorization: Bearer ${{ secrets.CRON_SECRET }}`. The sweep advances meetings stuck in a non-terminal state for over 10 minutes and purges audio past its retention window.
+
+Both need repo secrets `APP_URL` and `CRON_SECRET`. `/api/cron/sweep` rejects any request without a matching bearer token.
+
+## 9. Staying at zero cost
+
+| Signal | Where | Action |
+| --- | --- | --- |
+| Storage above 700 MB | Supabase → Storage | Reduce default `retention_days` to 3 |
+| Database above 350 MB | Supabase → Database | Archive transcripts older than a year |
+| Groq 429s appearing | app logs | Lower the `GROQ_DAILY_*` ceilings |
+| Vercel bandwidth above 70 GB | Vercel → Usage | Confirm audio is not being proxied through a route handler |
+| MAU approaching 50k | Supabase → Auth | Not a realistic MVP concern |
+
+Check monthly. The single most likely way to leave the free tier is proxying audio through Vercel instead of using signed URLs — the architecture avoids this and any change that reintroduces it should be rejected in review.
+
+## 10. Rollback
+
+- **Bad deploy:** Vercel → Deployments → previous → Promote to Production. Instant.
+- **Bad migration:** write a new forward migration that reverses it. Never edit an applied migration. Supabase free tier has no point-in-time recovery, so take a `supabase db dump` before any destructive migration.
+- **Leaked key:** rotate at the provider, update Vercel env vars, redeploy. For `SUPABASE_SERVICE_ROLE_KEY`, rotate in Supabase and treat the exposure window as a data incident per SECURITY-PRIVACY §6.
+
+## 11. Post-deploy verification
+
+- [ ] `/api/health` returns 200 and touches the database
+- [ ] Google sign-in completes and a `profiles` row is created
+- [ ] Upload a 2-minute fixture; it reaches `ready`
+- [ ] Transcript timestamps seek the audio correctly
+- [ ] Gmail draft is created; Gmail Sent is empty
+- [ ] Calendar event lands on the correct date
+- [ ] A second account gets 404 on the first account's meeting URL
+- [ ] Share link works signed-out; revoke returns 404
+- [ ] Both keep-alive and sweep workflows run green when triggered manually
+- [ ] Supabase, Groq, Vercel dashboards all show $0

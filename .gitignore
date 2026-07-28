@@ -1,0 +1,56 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next
+.next/
+out/
+build/
+next-env.d.ts
+
+# env
+.env
+.env.local
+.env*.local
+!.env.example
+
+# testing
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# vercel / turbo
+.vercel
+.turbo
+
+# supabase
+supabase/.branches
+supabase/.temp
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# local media - never commit recordings
+*.mp3
+*.m4a
+*.wav
+*.webm
+*.mp4
+*.mov
+!tests/fixtures/**/*.webm
+
+# ts
+*.tsbuildinfo
