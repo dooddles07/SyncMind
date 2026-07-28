@@ -6,7 +6,7 @@ Everything here is free. No payment method is required at any step.
 
 | Service | URL | Plan | What it gives us |
 | --- | --- | --- | --- |
-| GitHub | github.com | Free | Repo `dooddles07/SyncMind`, Actions for cron |
+| GitHub | github.com | Free | Repo `dooddles07/SyncMind` — **must stay public**, Actions for cron |
 | Supabase | supabase.com | Free | Postgres 500 MB, Auth, Storage 1 GB, 50k MAU |
 | Groq | console.groq.com | Free | Whisper ASR + Llama LLM, rate-limited |
 | Google Cloud | console.cloud.google.com | Free | Gmail + Calendar APIs, OAuth |
@@ -14,7 +14,7 @@ Everything here is free. No payment method is required at any step.
 | Google AI Studio | aistudio.google.com | Free | Gemini fallback key |
 | Sentry (optional) | sentry.io | Developer | 5k errors/month |
 
-Known ceilings to respect: Vercel Hobby is non-commercial and caps functions at 60s. Supabase pauses a project after 7 days of no activity. Groq free tier is rate-limited per day and caps audio uploads at 25 MB per request. Google OAuth in Testing mode allows at most 100 test users.
+Known ceilings to respect: Vercel Hobby is non-commercial and caps functions at 60s, 100 GB bandwidth/month, 100 build minutes/month. Supabase pauses a project after 7 days of no activity and caps free accounts at 2 active projects. Groq free tier is rate-limited per day and per model and caps audio uploads at 25 MB per request — confirm exact per-model numbers at `console.groq.com` before tuning quotas (see AI-PIPELINE §7). Google OAuth in Testing mode allows at most 100 test users. GitHub Actions minutes are free and unlimited only while the repo stays **public**.
 
 ## 2. Environment variables
 

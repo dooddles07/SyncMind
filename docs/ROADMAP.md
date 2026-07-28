@@ -7,7 +7,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 
 | # | Task |
 | --- | --- |
-| 0.1 | `git init`, push to `dooddles07/SyncMind`, `main` protected |
+| 0.1 | `git init`, push to `dooddles07/SyncMind` (**public repo** — keeps GitHub Actions cron minutes free), `main` protected |
 | 0.2 | `create-next-app` — TypeScript, App Router, Tailwind v4, ESLint |
 | 0.3 | shadcn/ui init; add Button, Input, Card, Dialog, Tabs, Badge, Toast, Skeleton, Progress, DropdownMenu, Select, Textarea, AlertDialog, Tooltip, Avatar, Separator, Sheet, Command |
 | 0.4 | Design tokens from DESIGN-SYSTEM §2-4 into `app/globals.css`; fonts via `next/font`; `next-themes` wired |
@@ -17,6 +17,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | 0.8 | Vercel project connected, preview deploys on PR |
 | 0.9 | `ci.yml` — typecheck, lint, unit; `keepalive.yml` — ping `/api/health` every 3 days |
 | 0.10 | Vitest and Playwright configured with one passing test each |
+| 0.11 | Check `console.groq.com` → Settings → Limits for both models; set real `GROQ_DAILY_*` values in `lib/quota.ts` defaults and log the confirmed numbers in ACTIVITY-LOG (see AI-PIPELINE §7) |
 
 **Exit:** an empty themed app deploys to Vercel, connects to Supabase, and CI is green.
 

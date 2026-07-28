@@ -279,9 +279,16 @@ Configured daily ceilings, enforced in `lib/quota.ts` before any upstream call:
 | `GROQ_DAILY_AUDIO_SECONDS` | 21600 | ~6 hours of audio per user per day |
 | `GROQ_DAILY_ASR_CALLS` | 60 | ~10 meetings |
 | `GROQ_DAILY_LLM_CALLS` | 80 | analysis + email + asks |
-| `GROQ_DAILY_LLM_TOKENS` | 400000 | conservative headroom |
+| `GROQ_DAILY_LLM_TOKENS` | 400000 | placeholder — **must be re-tuned against real limits, see below** |
 
-Exceeding a ceiling sets `meetings.status = 'quota_blocked'` with `resume_at` at the next UTC midnight. This is a product behavior with UI copy, not an exception.
+**These defaults are unverified against Groq's actual current numbers and are very likely too generous.** Third-party trackers as of mid-2026 put the free tier for `llama-3.3-70b-versatile` around 1,000 requests/day and a per-minute token cap in the low tens of thousands — not officially confirmed, but if directionally correct, a single analysis call (~26k input tokens for a 1-hour meeting) could hit the per-*minute* ceiling on its own, independent of the daily total. `lib/quota.ts` as specified only tracks daily sums; it has no per-minute awareness.
+
+Before tuning these env vars (M0/M2), pull the authoritative numbers from `console.groq.com` → Settings → Limits (per-model, logged in) and:
+1. Set `GROQ_DAILY_LLM_TOKENS` to the real per-model daily figure, not a guess.
+2. If a per-minute token cap exists and is anywhere near the size of one analysis call, either (a) confirm Groq queues/backs off automatically on 429 — the retry ladder in ARCHITECTURE §7 already handles this — or (b) shrink the map-reduce threshold in §3 below 60k tokens so single calls stay comfortably under the per-minute cap.
+3. Log the confirmed numbers in ACTIVITY-LOG so this stops being an open item.
+
+Exceeding a ceiling sets `meetings.status = 'quota_blocked'` with `resume_at` at the next UTC midnight. This is a product behavior with UI copy, not an exception. A burst of uploads cannot bypass this: every ASR/LLM call — not just the meeting-create step — checks projected spend against the ceiling first, so ten simultaneous uploads throttle at the same per-unit gate a single large meeting would.
 
 ## 8. Quality evaluation
 

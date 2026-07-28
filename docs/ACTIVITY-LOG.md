@@ -34,9 +34,10 @@ Running record of decisions and work. Newest first. Not auto-committed.
 - `.gitignore`, `.env.example`
 
 **Open items to resolve before or during M0:**
-1. Confirm the Groq free-tier daily limits as published at build time and tune the `GROQ_DAILY_*` defaults to match. The values in AI-PIPELINE §7 are conservative estimates.
+1. Confirm the Groq free-tier limits as published at build time (`console.groq.com` → Settings → Limits, per model) and tune the `GROQ_DAILY_*` defaults to match — **not conservative estimates, verify directly.** Third-party trackers checked 2026-07-28 suggest `llama-3.3-70b-versatile` free tier may be closer to ~1,000 req/day with a per-minute token cap in the low tens of thousands — much tighter than the current `GROQ_DAILY_LLM_TOKENS=400000` placeholder, and possibly tight enough that a single analysis call brushes the per-minute limit. See AI-PIPELINE §7 for the required tuning steps. Unconfirmed — official Groq console is the only trustworthy source, third-party pages are not authoritative.
 2. Verify `whisper-large-v3-turbo` and `llama-3.3-70b-versatile` are still the current ids on the Groq models endpoint.
-3. Decide the production domain. Vercel subdomain is fine for MVP; a custom domain is a small annual cost outside the zero-cost constraint.
+3. **Decided:** production domain is the Vercel-provided subdomain (`*.vercel.app`). No custom domain — that carries an annual registration cost, which breaks the $0 constraint. Not revisited unless the constraint itself is dropped.
+4. **Decided:** GitHub repo stays **public**. GitHub Actions minutes are free and unlimited on public repos; a private repo caps free Actions minutes and could eventually push the keep-alive/sweep crons toward a paid tier. No private-data risk since the app has no secrets or user data in the repo (SECURITY-PRIVACY §9).
 
 **Next:** M0 in `docs/ROADMAP.md` — repo init, Next.js scaffold, Supabase project, migrations, CI.
 
