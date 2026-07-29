@@ -4,6 +4,35 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — GitHub repo secrets added, E2E confirmed green in real CI, cron-job.org pinger live
+
+**Done, three small closing items:**
+
+- Added the 4 repo secrets `e2e.yml` needs (`NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `E2E_TEST_SECRET`) via GitHub's UI. Manual step, only the user could do it
+  (no `gh` CLI in this environment).
+- Opened a real trial PR (`chore/verify-e2e-ci`, a one-line no-op comment in
+  `e2e.yml`) specifically to verify the E2E workflow actually runs green in
+  GitHub Actions, not just locally — `E2E / e2e (pull_request)` passed in 3m
+  alongside the existing `CI / build` check. Closed the PR and deleted the
+  branch afterward (local + remote); it existed only to trigger one real CI
+  run.
+- Confirmed `cron-job.org`'s free tier is real before recommending it (fetched
+  their own pricing page rather than trusting the doc's prior placeholder
+  claim) — genuinely free, no card, no paid tier, donation-funded. Set up
+  the `SyncMind keepalive` job for real: `GET
+  https://sync-mind-three.vercel.app/api/health` on `0 0 */3 * *`, confirmed
+  created and enabled in the cron-job.org dashboard. This one was flagged as
+  optional (the GitHub Actions `keepalive.yml` heartbeat already does the
+  real job; this is pure redundancy against a GitHub-side outage) — the user
+  chose to do it anyway after confirming it was skippable.
+- `docs/GAP-ANALYSIS.md` P0.2 and the zero-cost stack table updated to
+  reflect both are live. This closes out every remaining item — code and
+  external configuration both — on the gap analysis.
+
+---
+
 ## 2026-07-29 — Playwright E2E, real full-flow spec (GAP-ANALYSIS 2.9, last test gap)
 
 **Done:** the last real doc-vs-code gap. `docs/ARCHITECTURE.md` §10 specifies
