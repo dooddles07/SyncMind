@@ -1,4 +1,5 @@
 name: E2E
+# Trial PR: first real CI run now that repo secrets are set.
 
 on:
   pull_request:
