@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { AskPanel } from "@/components/app/ask-panel";
+import { DeleteMeetingButton } from "@/components/app/delete-meeting-button";
 import { EmailComposer } from "@/components/app/email-composer";
 import { ExportMenu } from "@/components/app/export-menu";
 import { NotesPanel } from "@/components/app/notes-panel";
@@ -71,6 +72,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
           <div className="flex gap-2">
             <ExportMenu meetingId={meeting.id} />
             <ShareButton meetingId={meeting.id} initialLink={shareLink} />
+            <DeleteMeetingButton meetingId={meeting.id} />
           </div>
         </div>
       </div>

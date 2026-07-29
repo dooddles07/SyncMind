@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/server/models/database.types";
+import { getStoragePathsForMeeting } from "@/server/models/audio-chunk-model";
 import {
   insertAudioChunks,
   insertMeeting,
@@ -85,4 +86,22 @@ export async function createMeeting(
 export async function finalizeUpload(supabase: SupabaseClient<Database>, meetingId: string): Promise<void> {
   await markAllChunksUploaded(supabase, meetingId);
   await updateMeetingStatus(supabase, meetingId, "transcribing");
+}
+
+/** Hard delete (docs/ARCHITECTURE.md section 5): storage objects first, then the
+ *  meetings row -- every child table already references meetings(id) on delete
+ *  cascade, so the row delete alone clears transcript_segments, summaries,
+ *  action_items, email_drafts, share_links, and ask_queries. Session-scoped
+ *  client: the "own rows" RLS policy on meetings is what actually enforces the
+ *  caller can only delete their own meeting, not a check this function performs
+ *  itself. */
+export async function deleteMeeting(supabase: SupabaseClient<Database>, meetingId: string): Promise<void> {
+  const paths = await getStoragePathsForMeeting(supabase, meetingId);
+  if (paths.length > 0) {
+    const { error: storageError } = await supabase.storage.from("recordings").remove(paths);
+    if (storageError) throw storageError;
+  }
+
+  const { error } = await supabase.from("meetings").delete().eq("id", meetingId);
+  if (error) throw error;
 }

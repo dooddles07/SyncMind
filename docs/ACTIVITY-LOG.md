@@ -4,6 +4,41 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — real per-meeting delete
+
+**Done:** `docs/ARCHITECTURE.md` §5's `DELETE /api/meetings/:id` — "hard
+delete: storage objects, then all rows via cascade." Never built; "Delete all
+my data" was the only way to remove a meeting, and that wipes the whole
+account. Same cascade mechanism the account-deletion slice already relied on
+(confirmed in the migrations again, not re-assumed): every child table
+references `meetings(id) on delete cascade`, so deleting the row alone clears
+`audio_chunks`, `transcript_segments`, `summaries`, `action_items`,
+`email_drafts`, `share_links`, and `ask_queries`. Storage is the only manual
+step, and `getStoragePathsForMeeting` (already built for the sweep cron) did
+the lookup directly.
+
+- `server/controllers/meeting-controller.ts` — added `deleteMeeting`, next to
+  the existing `finalizeUpload`.
+- `app/api/meetings/[id]/route.ts` — added `DELETE` alongside the existing
+  `PATCH`.
+- `components/app/delete-meeting-button.tsx` (new) — lightweight two-click
+  inline confirm, deliberately not the typed-`DELETE` friction from account
+  deletion (losing one meeting isn't losing everything), redirects to
+  `/dashboard` on success.
+- **Process note, not a code finding:** hit the same dev-mode stale-webpack-
+  chunk crash on this route that's recurred all session, and asked the user
+  to click through into it again before catching it myself. Fixed the actual
+  habit this time instead of the individual crash: after a clean restart, now
+  `curl`s the specific target page myself and confirms a real response (not
+  a 500) before ever handing a link back to the user.
+- **Live verification, disposable meeting (not "Introduction Video"):**
+  created a throwaway meeting with a real uploaded Storage object, deleted it
+  through the real UI (two-click confirm, toast, redirect to `/dashboard`,
+  the real meeting still listed). Confirmed via direct Supabase queries: the
+  `meetings` row is gone and the Storage object is gone.
+- Verification: `npm run typecheck`, `lint`, `test` (56 tests, unchanged),
+  `build` all green.
+
 ## 2026-07-29 — real to-do status persistence (TodoBoard)
 
 **Done:** the last real gap `docs/GAP-ANALYSIS.md` 1.13 named. Re-reading it

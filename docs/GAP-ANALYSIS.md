@@ -148,7 +148,7 @@ land under `server/`, organized by layer, not by domain.
 - Responsive verification at 375 / 768 / 1024 / 1440 (ROADMAP 5.8).
 - ~~Export paths: Markdown, print stylesheet for PDF, `.srt` / `.txt` transcript, `.ics`.~~ **All done** — `GET /api/meetings/:id/export?format=md|srt|txt`, `components/app/print-minutes.tsx` + `print:` variant for PDF, `.ics` shipped earlier (M4). Verified live: real downloads, real `.srt` cue timestamps from `end_sec`, clean print preview.
 - ~~Real share-link creation with revoke.~~ **Done** — see 1.10/1.11.
-- ~~Hard delete verified against the Supabase dashboard.~~ **Done** (account-level; per-meeting `DELETE /api/meetings/:id` is still separate, unbuilt) — see 1.11.
+- ~~Hard delete verified against the Supabase dashboard.~~ **Done, both levels** — account-level (1.11) and now per-meeting: `DELETE /api/meetings/:id`, `server/controllers/meeting-controller.ts`'s `deleteMeeting`, `components/app/delete-meeting-button.tsx`. Verified live on a disposable meeting: real Supabase row and Storage object both confirmed gone, the real meeting used for every other verification this session untouched.
 - Eval fixture set and `npm run eval`.
 - Analytics: Vercel Web Analytics has a free Hobby tier; confirm the current event cap before wiring.
 
