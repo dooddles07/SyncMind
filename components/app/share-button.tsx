@@ -1,17 +1,20 @@
 "use client";
 
 import { Check, Copy, Share2 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import type { ShareLink } from "@/lib/mock/data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDismissablePanel } from "@/lib/use-dismissable-panel";
 
 export function ShareButton({ meetingId, initialLink }: { meetingId: string; initialLink: ShareLink | null }) {
   const [open, setOpen] = useState(false);
   const [link, setLink] = useState(initialLink);
   const [includeTranscript, setIncludeTranscript] = useState(false);
   const [busy, setBusy] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const { panelRef, triggerRef } = useDismissablePanel(open, close);
 
   async function create() {
     setBusy(true);
@@ -56,13 +59,24 @@ export function ShareButton({ meetingId, initialLink }: { meetingId: string; ini
 
   return (
     <div className="relative">
-      <Button variant="outline" size="sm" onClick={() => setOpen((v) => !v)}>
+      <Button
+        ref={triggerRef}
+        variant="outline"
+        size="sm"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen((v) => !v)}
+      >
         <Share2 className="size-4" aria-hidden />
         Share a read-only link
       </Button>
 
       {open && (
-        <div className="absolute right-0 z-10 mt-2 w-80 rounded-lg border border-border bg-card p-4 shadow-lg">
+        <div
+          ref={panelRef}
+          aria-label="Share this meeting"
+          className="absolute right-0 z-10 mt-2 w-80 rounded-lg border border-border bg-card p-4 shadow-lg"
+        >
           {link ? (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground">

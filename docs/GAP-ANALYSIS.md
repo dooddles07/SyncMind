@@ -144,7 +144,7 @@ land under `server/`, organized by layer, not by domain.
 
 ## P3 — After it is live.
 
-- Accessibility pass: contrast on all three semantic tones, focus order, full keyboard path, screen-reader labels (ROADMAP 5.7).
+- ~~Accessibility pass: contrast on all three semantic tones, focus order, full keyboard path, screen-reader labels (ROADMAP 5.7).~~ **Done.** Contrast was a stated design intent, never checked — verified for real: all 30 `*-text`-on-background/card/`*-soft` pairs across light and dark computed via an actual canvas-rendered WCAG contrast check (not eyeballed), lowest ratio 5.11, all clear AA's 4.5:1. Real gap found and fixed: `ExportMenu`/`ShareButton`'s inline expanding panels had no popover semantics at all — no `aria-expanded`/`aria-haspopup`, no Escape-to-close, no click-outside-to-close, no focus return to trigger. Fixed with a shared `lib/use-dismissable-panel.ts` hook; verified live (Escape and outside-click both close and return focus, confirmed by the user on the real meeting page). Skip link confirmed as the actual first Tab stop on the marketing page via Playwright, not assumed.
 - Responsive verification at 375 / 768 / 1024 / 1440 (ROADMAP 5.8).
 - ~~Export paths: Markdown, print stylesheet for PDF, `.srt` / `.txt` transcript, `.ics`.~~ **All done** — `GET /api/meetings/:id/export?format=md|srt|txt`, `components/app/print-minutes.tsx` + `print:` variant for PDF, `.ics` shipped earlier (M4). Verified live: real downloads, real `.srt` cue timestamps from `end_sec`, clean print preview.
 - ~~Real share-link creation with revoke.~~ **Done** — see 1.10/1.11.
