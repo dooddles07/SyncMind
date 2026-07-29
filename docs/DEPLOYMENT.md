@@ -22,6 +22,8 @@ No Google OAuth consent-screen verification is needed: sign-in requests only `em
 
 Copy `.env.example` to `.env.local` for local work; set the same keys in Vercel for Preview and Production.
 
+**`.env.local` never reaches Vercel automatically — this has caused two real incidents** (`docs/ACTIVITY-LOG.md`, 2026-07-29): the Supabase keys took the live site down entirely (`middleware.ts` crashed on every request), and `GROQ_API_KEY` being missing silently broke transcription until caught by checking the DB directly. **Every time a new variable is added to `.env.local`, add it to Vercel in the same sitting — not "later."**
+
 | Variable | Where to get it | Exposure |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL | client |

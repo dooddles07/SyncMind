@@ -72,13 +72,43 @@ length-probe method as every other key check this session) — real end-to-end
 transcription against the "Introduction Video" meeting from last session needs it,
 same external-key shape as every other provider this project uses.
 
-**Not yet verified live:** the actual Groq call, the quota accounting writing a real
-row, and the retry ladder under a real 429/5xx (hard to trigger organically without
-deliberately abusing the free tier, which isn't worth doing just to prove a
-well-specified, code-reviewed retry loop). Flagged honestly rather than assumed.
+**Real bug found on first live test, fixed immediately:** `chunk_status` has 5 values
+(`pending → uploaded → processing → done/failed`) — `pending` means "not yet
+uploaded," set at meeting creation; `finalizeUpload` clears it to `uploaded` once
+every signed-URL `PUT` succeeds. `claimNextPendingChunk` queried for `status =
+'pending'`, but by the time transcription can run every real chunk is already
+`uploaded`. It found nothing, concluded "no work left," and silently advanced the
+meeting straight to `"analyzing"` without transcribing anything. Caught by checking
+the real DB after the first live attempt (`transcript_segments` empty, chunk
+untouched, `usage_daily` empty) rather than trusting the UI's "Picked apart" state at
+face value. Fixed: renamed and corrected to `claimNextChunkToTranscribe`/
+`hasChunksAwaitingTranscription`, querying `'uploaded'` (and `releaseChunk` now
+returns a chunk to `'uploaded'`, not `'pending'`). Reset the test meeting's chunk back
+to `uploaded` and meeting back to `transcribing` to retry with the fix.
 
-**Next:** once transcription is verified live, minutes/actions/email (M3) is the
-remaining AI-layer chunk — needs Zod schemas and structured LLM output, not built yet.
+**Second real gap on retry:** `GROQ_API_KEY` was only in `.env.local` — same class of
+mistake as the earlier Supabase production incident, `.env.local` never reaches
+Vercel automatically. The user was testing against the live site, not localhost.
+Added the key in Vercel (Production + Preview), redeployed, confirmed via
+`/api/health`'s commit SHA that the new deploy was actually live before retrying.
+
+**Fully verified live after both fixes — real data, not assumed:**
+- `transcript_segments`: 8 real rows, genuine Whisper transcription of the uploaded
+  audio, sequential timestamps `0.00s → 83.86s` matching the meeting's `duration_sec`.
+- `audio_chunks`: `status: "done"`, `attempts: 0` — succeeded on the first real call,
+  no retry ladder needed.
+- `usage_daily`: real row, `asr_calls: 1`, `audio_seconds: 84` — exactly the chunk's
+  duration, proving the atomic `increment_usage_daily` function works correctly.
+- `meetings.status`: `"analyzing"` — the pipeline correctly stopped at the real
+  boundary of what's built so far.
+
+**Retry ladder under a real 429/5xx still unverified** — didn't occur organically on
+a single successful call, and deliberately abusing the free tier just to trigger one
+isn't worth doing to prove a well-specified, code-reviewed loop. Flagged honestly,
+not assumed.
+
+**Next:** minutes/actions/email (M3) is the remaining AI-layer chunk — needs Zod
+schemas and structured LLM output, not built yet.
 
 ---
 
