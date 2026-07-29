@@ -7,14 +7,17 @@ import { Input } from "@/components/ui/input";
 import { formatTimecode, type Segment, type Speaker } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export function SpeakerChip({ speaker }: { speaker: Speaker }) {
+const UNKNOWN_SPEAKER: Speaker = { id: "unknown", label: "Unclear who", inferred: true };
+
+export function SpeakerChip({ speaker }: { speaker: Speaker | undefined }) {
+  const shown = speaker ?? UNKNOWN_SPEAKER;
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] font-semibold">
-        {speaker.label.slice(0, 1)}
+        {shown.label.slice(0, 1)}
       </span>
-      <span className="text-sm font-medium">{speaker.label}</span>
-      {speaker.inferred && (
+      <span className="text-sm font-medium">{shown.label}</span>
+      {shown.inferred && (
         <Badge tone="guessed" className="px-1.5 py-0 text-[10px]">
           Best guess
         </Badge>

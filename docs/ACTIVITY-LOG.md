@@ -4,6 +4,38 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — real bug: Transcript tab crash, wrong error "Go home" target
+
+**Done:** user-reported crash on production, not a planned slice. Opening the
+Transcript tab on a real meeting threw the root error boundary
+("Something went wrong").
+
+- **Root cause:** three of "Introduction Video"'s real transcript segments had
+  `speaker = null` (a data gap from earlier testing today, not a boundary bug
+  in the labeling range as first suspected — segments 6-8 were all inside the
+  applied range and should have been labeled). `getTranscript` maps a null
+  speaker to `speakerId: "unknown"`, but `getSpeakers()` only returns labels
+  that are actually non-null in the DB, so `"unknown"` never resolves in
+  `TranscriptPanel`'s `byId` lookup — `SpeakerChip` then read `.label` off
+  `undefined` and crashed. This isn't just this meeting's problem: any
+  meeting viewed mid-transcription (before analysis assigns speaker labels)
+  has null speakers by design and would hit the identical crash.
+- **Real fix, not just this meeting's data:** `SpeakerChip` now accepts
+  `Speaker | undefined` and falls back to a real "Unclear who" pseudo-speaker
+  instead of assuming every id resolves — the actual root cause (unsafe
+  indexing) rather than the symptom (one meeting's stale nulls).
+- **Data patch:** the three real null segments corrected to `"Speaker 1"`
+  directly (matches the rest of the meeting — one speaker throughout), fixing
+  production immediately since it's the same Supabase project, independent of
+  the code deploy.
+- **Second real bug caught while fixing the first:** the root `app/error.tsx`'s
+  "Go home" always links to `/` (the marketing landing page) — wrong for a
+  signed-in user hitting an error inside the app. Added `app/(app)/error.tsx`,
+  a route-group-scoped error boundary (Next.js resolves the closer one first),
+  identical UI but "Go home" → `/dashboard`.
+- Verification: `npm run typecheck`, `lint`, `test` (56 tests, unchanged),
+  `build` all green.
+
 ## 2026-07-29 — real per-meeting delete
 
 **Done:** `docs/ARCHITECTURE.md` §5's `DELETE /api/meetings/:id` — "hard
