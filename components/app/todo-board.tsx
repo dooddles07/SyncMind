@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, isOverdue, type Todo, type TodoStatus } from "@/lib/types";
 import { spring } from "@/lib/motion";
@@ -28,7 +29,16 @@ export function TodoBoard({ initial }: { initial: Todo[] }) {
     (t) => (owner === "all" || t.owner === owner) && (!lateOnly || isOverdue(t)),
   );
 
-  function move(id: string, status: TodoStatus) {
+  async function move(id: string, status: TodoStatus) {
+    const res = await fetch(`/api/actions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) {
+      toast.error("Could not save. Try again.");
+      return;
+    }
     setTodos((all) => all.map((t) => (t.id === id ? { ...t, status } : t)));
   }
 

@@ -23,6 +23,15 @@ export async function getActionItems(
   return data;
 }
 
+export async function updateActionItemStatus(
+  supabase: SupabaseClient<Database>,
+  id: string,
+  status: Database["public"]["Enums"]["action_status"],
+): Promise<void> {
+  const { error } = await supabase.from("action_items").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function insertActionItems(
   supabase: SupabaseClient<Database>,
   items: ActionItemInsert[],

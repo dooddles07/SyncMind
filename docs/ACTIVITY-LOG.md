@@ -4,6 +4,34 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — real to-do status persistence (TodoBoard)
+
+**Done:** the last real gap `docs/GAP-ANALYSIS.md` 1.13 named. Re-reading it
+directly: `TodoTable` (per-meeting) actually has no edit UI at all — the doc's
+claim about it doesn't match the component, nothing to fix. `TodoBoard`
+(`/tasks` cross-meeting kanban) was the one real gap: `useState(initial)` plus
+a `move(id, status)` that updated local state on the status `<select>` and
+never called anything server-side — moving a card between columns silently
+did nothing past a page refresh, even though `action_items` is a fully real
+table.
+
+- `server/models/action-item-model.ts` — added `updateActionItemStatus`.
+- `app/api/actions/[id]/route.ts` (`PATCH { status }`, the endpoint
+  `docs/ARCHITECTURE.md` §5 already named) — maps the UI's `"doing"` to the
+  DB's `"in_progress"` (reverse of the mapping `getTodos` already does the
+  other way), validates against the three real enum values.
+- `components/app/todo-board.tsx` — `move()` now `PATCH`es first, updates
+  local state on success, toasts on failure. Same call-then-update convention
+  as `EmailComposer`/`AskPanel`, not a new optimistic-update pattern.
+- **Live verification, real account:** since "Introduction Video" has zero
+  real to-dos (a short self-intro with no commitments — correctly, not a
+  bug), inserted one disposable test to-do to actually exercise the move.
+  Moved it through the real UI (todo → in progress → done), confirmed via
+  direct Supabase query that `action_items.status` genuinely reached `"done"`
+  — not just a local re-render. Cleaned up the disposable row afterward.
+- Verification: `npm run typecheck`, `lint`, `test` (56 tests, unchanged),
+  `build` all green.
+
 ## 2026-07-29 (M5.3 / F12) — real export: Markdown, PDF, transcript .txt/.srt
 
 **Done:** `docs/PRODUCT-REQUIREMENTS.md` F12 in full except `.ics` (already
