@@ -10,11 +10,7 @@ import type { Database } from "@/server/models/database.types";
 import type { MeetingRow } from "@/server/models/meeting-model";
 import { insertActionItems, type ActionItemInsert } from "@/server/models/action-item-model";
 import { upsertSummary } from "@/server/models/summary-model";
-import {
-  applySpeakerRanges,
-  getSegmentsForMeeting,
-  type TranscriptSegmentRow,
-} from "@/server/models/transcript-model";
+import { applySpeakerRanges, getSegmentsForMeeting } from "@/server/models/transcript-model";
 import { formatTimestamp } from "@/server/utils/format-timestamp";
 import { QuotaBlockedError } from "@/server/utils/pipeline-errors";
 import { runStructuredAndValidate } from "@/server/utils/structured-output";
@@ -26,6 +22,13 @@ const CHARS_PER_TOKEN = 4;
 const ESTIMATED_OUTPUT_TOKENS = 2500;
 
 export class AnalysisTooLongError extends Error {}
+
+/** Minimal shape `runAnalysisModel` needs from a transcript segment -- lets
+ *  callers without a DB row (the eval script) pass plain objects instead of
+ *  a full `TranscriptSegmentRow`. */
+export type AnalysisSegmentInput = { speaker: string | null; start_sec: number; text: string };
+
+export type AnalysisMeetingInput = { title: string; meeting_date: string; duration_sec: number };
 
 const SYSTEM_PROMPT = `You are an expert meeting analyst. You produce accurate, structured minutes from
 meeting transcripts. You are precise and conservative: you record only what was
@@ -69,7 +72,7 @@ function formatDuration(durationSec: number): string {
   return `${h}h ${m}m`;
 }
 
-function serializeTranscript(segments: TranscriptSegmentRow[]): { text: string; speakerLabels: string[] } {
+function serializeTranscript(segments: AnalysisSegmentInput[]): { text: string; speakerLabels: string[] } {
   const speakerLabels: string[] = [];
   const lines = segments.map((segment) => {
     const label = segment.speaker ?? "Speaker 1";
@@ -111,17 +114,12 @@ function cleanActionItems(
   return kept;
 }
 
-export async function analyzeMeeting(
-  supabase: SupabaseClient<Database>,
-  meeting: MeetingRow,
-): Promise<void> {
-  const segments = await getSegmentsForMeeting(supabase, meeting.id);
+function buildPrompt(
+  meeting: AnalysisMeetingInput,
+  segments: AnalysisSegmentInput[],
+): { userPrompt: string; transcriptTokens: number } {
   const { text: transcript, speakerLabels } = serializeTranscript(segments);
-
   const transcriptTokens = estimateTokens(transcript);
-  if (transcriptTokens > SINGLE_PASS_SAFE_TOKENS) {
-    throw new AnalysisTooLongError("This meeting is too long to analyze yet.");
-  }
 
   const userPrompt = `MEETING_TITLE: ${meeting.title}
 MEETING_DATE: ${meeting.meeting_date}
@@ -133,36 +131,80 @@ ${transcript}
 
 Produce the JSON object described in the schema.`;
 
+  return { userPrompt, transcriptTokens };
+}
+
+/** Projected total tokens for a quota check, before spending anything on the
+ *  real LLM call. Also throws `AnalysisTooLongError` early if the transcript
+ *  itself is already past the single-pass safe limit. */
+export function estimateAnalysisTokens(
+  meeting: AnalysisMeetingInput,
+  segments: AnalysisSegmentInput[],
+): { transcriptTokens: number; projectedTokens: number } {
+  const { userPrompt, transcriptTokens } = buildPrompt(meeting, segments);
+  if (transcriptTokens > SINGLE_PASS_SAFE_TOKENS) {
+    throw new AnalysisTooLongError("This meeting is too long to analyze yet.");
+  }
   const projectedTokens = estimateTokens(SYSTEM_PROMPT) + estimateTokens(userPrompt) + ESTIMATED_OUTPUT_TOKENS;
-  const quota = await checkAndReserve(supabase, meeting.user_id, { llmTokens: projectedTokens });
-  if (!quota.ok) {
-    throw new QuotaBlockedError(quota.resumeAt);
+  return { transcriptTokens, projectedTokens };
+}
+
+/** Runs the real Groq analysis call and applies the same clamp/dedupe rules
+ *  the live pipeline uses -- no DB, no quota, callable standalone (used by
+ *  both `analyzeMeeting` below and `scripts/eval.ts`). */
+export async function runAnalysisModel(
+  meeting: AnalysisMeetingInput,
+  segments: AnalysisSegmentInput[],
+): Promise<{ analysis: Analysis; totalTokens: number }> {
+  const { userPrompt, transcriptTokens } = buildPrompt(meeting, segments);
+  if (transcriptTokens > SINGLE_PASS_SAFE_TOKENS) {
+    throw new AnalysisTooLongError("This meeting is too long to analyze yet.");
   }
 
   const { result, totalTokens } = await runStructuredAndValidate(AnalysisSchema, SYSTEM_PROMPT, userPrompt, {
     temperature: 0.2,
   });
-  await recordUsage(supabase, { llmTokens: totalTokens }, meeting.user_id);
 
   const durationSec = meeting.duration_sec;
-  const topics = result.topics.map((t) => ({ ...t, atSec: clamp(t.atSec, durationSec) }));
-  const decisions = result.decisions.map((d) => ({ ...d, atSec: clamp(d.atSec, durationSec) }));
-  const openQuestions = result.openQuestions.map((q) => ({ ...q, atSec: clamp(q.atSec, durationSec) }));
-  const actionItems = cleanActionItems(result.actionItems, meeting.meeting_date, durationSec);
+  const analysis: Analysis = {
+    ...result,
+    topics: result.topics.map((t) => ({ ...t, atSec: clamp(t.atSec, durationSec) })),
+    decisions: result.decisions.map((d) => ({ ...d, atSec: clamp(d.atSec, durationSec) })),
+    openQuestions: result.openQuestions.map((q) => ({ ...q, atSec: clamp(q.atSec, durationSec) })),
+    actionItems: cleanActionItems(result.actionItems, meeting.meeting_date, durationSec),
+  };
+
+  return { analysis, totalTokens };
+}
+
+export async function analyzeMeeting(
+  supabase: SupabaseClient<Database>,
+  meeting: MeetingRow,
+): Promise<void> {
+  const segments = await getSegmentsForMeeting(supabase, meeting.id);
+
+  const { projectedTokens } = estimateAnalysisTokens(meeting, segments);
+  const quota = await checkAndReserve(supabase, meeting.user_id, { llmTokens: projectedTokens });
+  if (!quota.ok) {
+    throw new QuotaBlockedError(quota.resumeAt);
+  }
+
+  const { analysis, totalTokens } = await runAnalysisModel(meeting, segments);
+  await recordUsage(supabase, { llmTokens: totalTokens }, meeting.user_id);
 
   await upsertSummary(supabase, {
     meeting_id: meeting.id,
     user_id: meeting.user_id,
     model: ANALYSIS_MODEL,
-    overview: result.overview,
-    attendees: result.attendees,
-    topics,
-    decisions,
-    open_questions: openQuestions,
+    overview: analysis.overview,
+    attendees: analysis.attendees,
+    topics: analysis.topics,
+    decisions: analysis.decisions,
+    open_questions: analysis.openQuestions,
   });
 
-  if (actionItems.length > 0) {
-    const inserts: ActionItemInsert[] = actionItems.map((item, index) => ({
+  if (analysis.actionItems.length > 0) {
+    const inserts: ActionItemInsert[] = analysis.actionItems.map((item, index) => ({
       meeting_id: meeting.id,
       user_id: meeting.user_id,
       title: item.title,
@@ -177,7 +219,7 @@ Produce the JSON object described in the schema.`;
     await insertActionItems(supabase, inserts);
   }
 
-  if (result.speakerRanges && result.speakerRanges.length > 0) {
-    await applySpeakerRanges(supabase, meeting.id, result.speakerRanges);
+  if (analysis.speakerRanges && analysis.speakerRanges.length > 0) {
+    await applySpeakerRanges(supabase, meeting.id, analysis.speakerRanges);
   }
 }

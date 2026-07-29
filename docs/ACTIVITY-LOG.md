@@ -4,6 +4,44 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — Eval fixture set + `npm run eval` (GAP-ANALYSIS P3, last item)
+
+**Done:** last open P3 item. `docs/AI-PIPELINE.md` §8 already specified the
+shape; nothing existed yet (`tests/fixtures/`, an eval runner — confirmed
+missing before starting).
+
+- Split `server/controllers/analysis-controller.ts`: extracted
+  `runAnalysisModel` (real Groq call + the same clamp/dedupe rules the live
+  pipeline uses) and `estimateAnalysisTokens` (pre-call quota projection) out
+  of `analyzeMeeting`, which now just does quota-check → `runAnalysisModel` →
+  DB writes. No behavior change to the live pipeline — full verification
+  suite green before and after.
+- 5 hand-labeled fixtures in `tests/fixtures/meetings/`: standup, client
+  call, decision-heavy planning (includes one deliberately-vague item that
+  must NOT get a due date), rambling/no-actions (hallucination check), and a
+  poor-audio one with garbled ASR-style fragments mixed into real
+  commitments.
+- `scripts/eval.ts` (`npm run eval`) calls `runAnalysisModel` directly
+  against real Groq for all 5, matches generated vs. expected action items by
+  word-overlap (not the stricter `isNearDuplicate` — real generated titles
+  are rarely phrased identically to hand-written expected ones), and scores
+  recall/precision/owner accuracy/date accuracy against `AI-PIPELINE.md`'s
+  targets. Needed `tsx` as a new devDependency — Node's native TS runner
+  doesn't resolve the `@/` tsconfig path alias the rest of the codebase uses
+  throughout, confirmed by a first attempt that failed with
+  `ERR_MODULE_NOT_FOUND`. Deliberately not wired into `ci.yml`/`npm test` —
+  it spends real Groq tokens, meant for manual runs before a prompt change
+  ships.
+- Real run against live Groq: recall 1.00, owner accuracy 1.00, date
+  accuracy 1.00, hallucination check PASS. Precision 0.88, just under the
+  0.90 target — one extra action item on the client-call fixture; confirmed
+  via a throwaway debug script that a re-run of the same fixture produced a
+  different item count (2 vs 3), so this is real temp-0.2 LLM variance near
+  the threshold, not a bug in the eval harness itself.
+- `docs/GAP-ANALYSIS.md` P3 list is now fully resolved.
+
+---
+
 ## 2026-07-29 — Vercel Web Analytics wired (GAP-ANALYSIS P3)
 
 **Done:** confirmed real current Hobby free-tier limit by fetching Vercel's
