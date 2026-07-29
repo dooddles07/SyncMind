@@ -51,7 +51,7 @@ export function Nav() {
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <ThemeToggle />
           <Button asChild size="sm">
-            <Link href="/dashboard">Try it free</Link>
+            <Link href="/login">Try it free</Link>
           </Button>
         </div>
       </nav>

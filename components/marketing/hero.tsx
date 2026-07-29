@@ -62,7 +62,7 @@ export function Hero() {
               className="mt-8 flex flex-wrap items-center gap-3"
             >
               <Button asChild size="lg">
-                <Link href="/dashboard">
+                <Link href="/login">
                   Continue with Google
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>

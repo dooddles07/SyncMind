@@ -4,6 +4,104 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (later) — P1.3 external setup completed, sign-in fully live
+
+**Done:** the two external steps flagged in the earlier entry today are complete.
+
+- Google Cloud: new project `syncmind`, OAuth consent screen (External, published to
+  Production via the combined "Get started" wizard — Google's newer UI merges what
+  used to be separate consent-screen and audience steps), OAuth client ID (Web
+  application) with authorized origin `http://localhost:3000` and redirect URI
+  `https://keqagpktcrwuovkuqwno.supabase.co/auth/v1/callback` (Supabase's fixed
+  callback, not our own `/auth/callback` — the two are different URLs by design,
+  Supabase is the OAuth client from Google's perspective).
+- Supabase dashboard → Authentication → Sign In / Providers → Google → enabled,
+  client ID and secret pasted in, saved.
+
+**Re-verified with Playwright, this time reaching further than the earlier check
+could:** clicked "Continue with Google" on `/login` again. Instead of the `400`
+`"provider is not enabled"` from before, the browser now lands on a real
+`accounts.google.com/v3/signin/identifier` page — confirmed `client_id` matches the
+one just created, `redirect_uri=https://keqagpktcrwuovkuqwno.supabase.co/auth/v1/callback`
+matches exactly, `scope=email+profile` only (no Gmail/Calendar scopes ever
+requested, matching the P0.1 decision). Screenshot confirmed the real Google account
+picker rendering "Sign in to continue to keqagpktcrwuovkuqwno.supabase.co". Did not
+complete the sign-in itself with real credentials — that's the user's own account
+action, not something to automate.
+
+**P1.3 is now fully resolved, not just code-complete.** No remaining blocker.
+
+---
+
+## 2026-07-29 — P1.3: auth wired end-to-end, verified up to the external boundary
+
+**Done:** `middleware.ts` (repo root — Next.js requires this exact location, same
+class of constraint as `route.ts`; uses `@supabase/ssr`'s request/response-based
+client since middleware runs before `next/headers`' `cookies()` is available),
+`app/login/page.tsx` + `components/app/login-button.tsx` (split so the page can stay
+a Server Component exporting real `<title>` metadata — a client component can't
+export `metadata`, first version had a generic fallback title, caught and fixed),
+`app/auth/callback/route.ts` (exchanges the OAuth code for a session, redirects to
+`next` or `/dashboard`), sign-out wired into `components/app/sidebar.tsx` (didn't
+exist at all before), `app/(app)/settings/page.tsx`'s "You" section now reads the
+real session instead of the hardcoded "Maya Osei" fixture (P1.12, closed as a side
+effect of building real auth, not separate work). Marketing CTAs
+(`components/marketing/{nav,hero}.tsx`) repointed from `/dashboard` to `/login` — the
+hero button's copy already said "Continue with Google", it just didn't do anything
+yet.
+
+**Key finding that shaped scope, confirmed before writing code:**
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are configured *inside Supabase's own
+dashboard*, not read by our application code at all — Supabase is the OAuth client
+from Google's perspective, our code only calls `signInWithOAuth` and receives a
+`code` back. This meant the entire code portion of P1.3 needed zero additional env
+vars and could be built and verified today, with only the *external* configuration
+left as a genuine blocker.
+
+**Verified for real, not assumed — three separate checks:**
+1. `curl -i` against protected routes with no session: `/dashboard` and `/settings`
+   both `307` to `/login?next=<original path>`. Public routes (`/`, `/login`,
+   `/share/whatever`) stay `200`. Proves the middleware matcher and protection logic
+   are both correct.
+2. Playwright: `/login` renders correctly, zero console errors, correct page title
+   after the metadata fix.
+3. Playwright: actually clicked "Continue with Google". Browser navigated to a real
+   Supabase PKCE authorize URL
+   (`.../auth/v1/authorize?provider=google&redirect_to=...&code_challenge=...`) —
+   confirms `redirectTo` points at the right `/auth/callback` with `next` correctly
+   encoded. Got back `400 {"error_code":"validation_failed","msg":"Unsupported
+   provider: provider is not enabled"}` — the *exact* expected response, since the
+   Google provider isn't enabled in Supabase yet. This is proof the code is correct,
+   not a failure: everything up to Google's own OAuth screen works.
+
+**What actually unblocks a real, working sign-in — concrete, not abstract**
+(`docs/DEPLOYMENT.md` §5 already has the detailed version):
+1. Google Cloud Console (console.cloud.google.com) — new project, OAuth consent
+   screen (External, publish straight to Production — the `email`/`profile` scopes
+   are unrestricted, no Google review needed), Credentials → OAuth client ID → Web
+   application.
+2. Authorized redirect URI: the callback URL Supabase's dashboard shows you (step 3)
+   — not our own `/auth/callback`, Supabase's own domain.
+3. Supabase dashboard → Authentication → Providers → Google → enable, paste the
+   client ID and secret from step 1.
+4. Test by actually clicking "Continue with Google" on `/login` — should reach a real
+   Google consent screen instead of the `400` seen today.
+
+None of this needs `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` in `.env.local` — they
+only ever get pasted into Supabase's dashboard.
+
+**Verified:** `npm run typecheck`, `lint`, `test` (still 30 — no new pure-function
+logic worth unit testing here, this is I/O-shaped code exercised by the Playwright/
+curl checks above instead), `build` all green. Cleaned up accumulated zombie `node`
+processes from repeated background dev-server restarts this session
+(`Stop-Process` sweep) before the final verification run.
+
+**Next:** the client factories and auth are both real now. The next chunk is
+`app/api/**` route handlers plus swapping `lib/mock/data.ts` reads for real Supabase
+queries — the actual "the app does something" milestone.
+
+---
+
 ## 2026-07-29 — P1.2: Supabase client factories, and a real permission bug found + fixed
 
 **Done:** `lib/supabase/browser.ts` (publishable key, `createBrowserClient` from

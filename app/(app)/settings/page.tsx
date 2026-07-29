@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getUsage } from "@/lib/mock/data";
+import { createClient } from "@/server/config/supabase-server";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -28,6 +29,14 @@ function Section({
 
 export default async function SettingsPage() {
   const usage = await getUsage();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const name = user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "You";
+  const email = user?.email ?? "";
+  const initial = name.charAt(0).toUpperCase();
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
@@ -39,11 +48,11 @@ export default async function SettingsPage() {
       <Section title="You" description="This is the Google account SyncMind is signed in with.">
         <div className="flex items-center gap-3">
           <span className="flex size-10 items-center justify-center rounded-full bg-muted font-semibold">
-            M
+            {initial}
           </span>
           <div>
-            <p className="font-medium">Maya Osei</p>
-            <p className="text-sm text-muted-foreground">maya@example.com</p>
+            <p className="font-medium">{name}</p>
+            <p className="text-sm text-muted-foreground">{email}</p>
           </div>
         </div>
       </Section>

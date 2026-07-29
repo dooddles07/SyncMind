@@ -1,12 +1,13 @@
 "use client";
 
-import { CheckSquare, Menu, Mic, Settings, Upload, X } from "lucide-react";
+import { CheckSquare, LogOut, Menu, Mic, Settings, Upload, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Wordmark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -17,10 +18,18 @@ const nav = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   // Close the drawer on navigation so the next page is not hidden behind it
   useEffect(() => setOpen(false), [pathname]);
+
+  async function signOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
 
   const list = (
     <nav aria-label="Main" className="flex flex-col gap-1">
@@ -91,6 +100,10 @@ export function Sidebar() {
               </Link>
             </Button>
             {list}
+            <Button variant="ghost" onClick={signOut} className="mt-auto justify-start">
+              <LogOut className="size-4" aria-hidden />
+              Sign out
+            </Button>
           </div>
         </div>
       )}
@@ -107,9 +120,15 @@ export function Sidebar() {
           </Link>
         </Button>
         {list}
-        <div className="mt-auto flex items-center justify-between rounded-md border border-border p-2">
-          <span className="px-1 text-sm text-muted-foreground">Theme</span>
-          <ThemeToggle />
+        <div className="mt-auto flex flex-col gap-2">
+          <div className="flex items-center justify-between rounded-md border border-border p-2">
+            <span className="px-1 text-sm text-muted-foreground">Theme</span>
+            <ThemeToggle />
+          </div>
+          <Button variant="ghost" onClick={signOut} className="justify-start">
+            <LogOut className="size-4" aria-hidden />
+            Sign out
+          </Button>
         </div>
       </aside>
     </>
