@@ -533,6 +533,8 @@ export type Database = {
       }
       usage_daily: {
         Row: {
+          ask_calls: number
+          ask_tokens: number
           asr_calls: number
           audio_seconds: number
           day: string
@@ -541,6 +543,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ask_calls?: number
+          ask_tokens?: number
           asr_calls?: number
           audio_seconds?: number
           day?: string
@@ -549,6 +553,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ask_calls?: number
+          ask_tokens?: number
           asr_calls?: number
           audio_seconds?: number
           day?: string
@@ -573,6 +579,8 @@ export type Database = {
     Functions: {
       increment_usage_daily: {
         Args: {
+          p_ask_calls?: number
+          p_ask_tokens?: number
           p_asr_calls: number
           p_audio_seconds: number
           p_day: string
@@ -580,6 +588,18 @@ export type Database = {
           p_llm_tokens?: number
         }
         Returns: undefined
+      }
+      search_transcript_segments: {
+        Args: { p_limit?: number; p_meeting_id: string; p_query: string }
+        Returns: {
+          end_sec: number
+          id: number
+          rank: number
+          seq: number
+          speaker: string
+          start_sec: number
+          text: string
+        }[]
       }
     }
     Enums: {

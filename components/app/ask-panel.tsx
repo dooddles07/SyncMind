@@ -2,19 +2,52 @@
 
 import { CornerDownLeft } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatTimecode, type AskExchange } from "@/lib/types";
 
-export function AskPanel({ history }: { history: AskExchange[] }) {
+export function AskPanel({ history: initialHistory, meetingId }: { history: AskExchange[]; meetingId: string }) {
+  const [history, setHistory] = useState(initialHistory);
   const [question, setQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = question.trim();
+    if (!trimmed) return;
+
+    setAsking(true);
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: trimmed }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        toast.error(payload?.error?.message ?? "Could not get an answer.");
+        return;
+      }
+      const row = payload.query;
+      setHistory((prev) => [
+        ...prev,
+        {
+          id: row.id,
+          question: row.question,
+          answer: row.answer,
+          citations: (row.citations as { atSec: number }[]).map((c) => c.atSec),
+        },
+      ]);
+      setQuestion("");
+    } finally {
+      setAsking(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
-      <form
-        onSubmit={(e) => e.preventDefault()}
-        className="flex flex-col gap-3 sm:flex-row sm:items-end"
-      >
+      <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <label htmlFor="ask" className="mb-1.5 block text-sm font-medium">
             Ask anything about this meeting
@@ -26,9 +59,9 @@ export function AskPanel({ history }: { history: AskExchange[] }) {
             placeholder="Did we agree a date for the contract?"
           />
         </div>
-        <Button type="submit" disabled={!question.trim()}>
+        <Button type="submit" disabled={!question.trim() || asking}>
           <CornerDownLeft className="size-4" aria-hidden />
-          Ask
+          {asking ? "Asking…" : "Ask"}
         </Button>
       </form>
 

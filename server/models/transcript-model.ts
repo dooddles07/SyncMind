@@ -53,6 +53,25 @@ export async function getCarryoverPrompt(
   return data?.text.slice(-200);
 }
 
+/** Fetches specific segments by their `seq` -- the ±1-expansion step of Ask's
+ *  retrieval (docs/AI-PIPELINE.md section 6): take the ranked matches from
+ *  search_transcript_segments, then pull their neighbors for reading context. */
+export async function getSegmentsBySeq(
+  supabase: SupabaseClient<Database>,
+  meetingId: string,
+  seqs: number[],
+): Promise<TranscriptSegmentRow[]> {
+  if (seqs.length === 0) return [];
+  const { data, error } = await supabase
+    .from("transcript_segments")
+    .select("*")
+    .eq("meeting_id", meetingId)
+    .in("seq", seqs)
+    .order("seq", { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
 export async function insertStitchedSegments(
   supabase: SupabaseClient<Database>,
   args: { meetingId: string; userId: string; chunkIndex: number; segments: StitchedSegment[] },

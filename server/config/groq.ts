@@ -7,6 +7,7 @@ import type { WhisperSegment } from "@/server/utils/transcript-stitch";
 
 const WHISPER_MODEL = "whisper-large-v3-turbo";
 const ANALYSIS_MODEL = "llama-3.3-70b-versatile";
+export const ASK_MODEL = "llama-3.1-8b-instant";
 const RETRY_BACKOFF_MS = [2000, 6000, 18000];
 
 export class GroqRateLimitError extends Error {
@@ -104,6 +105,7 @@ export async function transcribeChunk(
 
 interface StructuredCompletionOptions {
   temperature: number;
+  model?: string;
 }
 
 export interface StructuredCompletionUsage {
@@ -122,7 +124,7 @@ export interface StructuredCompletionResult {
 export async function runStructuredCompletion(
   systemPrompt: string,
   userPrompt: string,
-  { temperature }: StructuredCompletionOptions,
+  { temperature, model = ANALYSIS_MODEL }: StructuredCompletionOptions,
 ): Promise<StructuredCompletionResult> {
   const apiKey = requireApiKey();
 
@@ -134,7 +136,7 @@ export async function runStructuredCompletion(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: ANALYSIS_MODEL,
+        model,
         temperature,
         response_format: { type: "json_object" },
         messages: [

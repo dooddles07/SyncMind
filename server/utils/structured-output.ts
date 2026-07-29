@@ -19,7 +19,7 @@ export async function runStructuredAndValidate<T>(
   schema: z.ZodType<T>,
   systemPrompt: string,
   userPrompt: string,
-  options: { temperature: number },
+  options: { temperature: number; model?: string },
 ): Promise<{ result: T; totalTokens: number }> {
   const first = await runStructuredCompletion(systemPrompt, userPrompt, options);
   let totalTokens = first.usage.totalTokens;

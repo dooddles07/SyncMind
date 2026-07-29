@@ -104,7 +104,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
           <EmailComposer draft={draft} meetingId={meeting.id} />
         </TabsContent>
         <TabsContent value="ask">
-          <AskPanel history={history} />
+          <AskPanel history={history} meetingId={meeting.id} />
         </TabsContent>
       </Tabs>
     </div>

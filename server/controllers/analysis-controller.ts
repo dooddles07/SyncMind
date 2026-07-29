@@ -15,6 +15,7 @@ import {
   getSegmentsForMeeting,
   type TranscriptSegmentRow,
 } from "@/server/models/transcript-model";
+import { formatTimestamp } from "@/server/utils/format-timestamp";
 import { QuotaBlockedError } from "@/server/utils/pipeline-errors";
 import { runStructuredAndValidate } from "@/server/utils/structured-output";
 import { isNearDuplicate } from "@/server/utils/text-similarity";
@@ -61,13 +62,6 @@ SCHEMA (Groq's JSON mode does not enforce this itself -- match these exact keys)
   "speakerRanges": [{ "fromSec": number, "toSec": number, "speakerLabel": string }] (optional)
 }
 Every array may be empty. speakerLabel values must match one of SPEAKER_LABELS_PRESENT below.`;
-
-function formatTimestamp(totalSec: number): string {
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = Math.floor(totalSec % 60);
-  return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
-}
 
 function formatDuration(durationSec: number): string {
   const h = Math.floor(durationSec / 3600);

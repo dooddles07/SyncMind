@@ -4,6 +4,63 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (M3 slice 3) — real "Ask this meeting", M3 fully done
+
+**Done:** the last unbuilt piece of M3 (`docs/AI-PIPELINE.md` §6) — real Q&A over a
+meeting's transcript, retrieval-shaped, no vector database. `AskPanel`'s form
+previously did `e.preventDefault()` and nothing else; it now really asks Groq and
+persists to `ask_queries`. Verified live against "Introduction Video", including
+through the actual browser UI (not just script/API verification).
+
+- **Migration** — `usage_daily` gets its own `ask_calls`/`ask_tokens` bucket for
+  `llama-3.1-8b-instant` (§7 gives Ask a separate, much higher daily ceiling than
+  the 70B analysis/email bucket). `increment_usage_daily` grew to 7 params --
+  dropped and recreated in one migration this time instead of two, applying the
+  lesson from the M3-slice-1 overload bug directly rather than repeating it.
+  `search_transcript_segments(meeting_id, query, limit)` (new SQL function,
+  `security invoker`) does the `ts_rank_cd`-ranked query Supabase-js's builder
+  can't express — the GIN index it needs already existed
+  (`transcript_meeting_seq_idx`/`transcript_fts_idx`, migration
+  `20260729004531_transcripts.sql`) but nothing had queried it until now.
+- `lib/quota.ts` extended a third time (`askTokens`, `GROQ_DAILY_ASK_CALLS`/
+  `GROQ_DAILY_ASK_TOKENS`, defaults 14400/500000 -- the confirmed §7 numbers).
+- `server/config/groq.ts` — `runStructuredCompletion` gained an optional `model`
+  param (defaulting to the existing 70B constant) so Ask can call the cheaper
+  `llama-3.1-8b-instant` instead; `server/utils/structured-output.ts` forwards it.
+- `server/utils/format-timestamp.ts` (new) — the `HH:MM:SS` formatter, previously
+  private inside `analysis-controller.ts`, extracted so `ask-controller.ts` isn't
+  a third copy of the same eight lines.
+- `server/controllers/ask-controller.ts` — `answerQuestion`: 20-questions-per-
+  meeting-per-day product cap (`countAskQueriesToday`, independent of the Groq-cost
+  quota); retrieval sends the full transcript under 12k tokens, otherwise the new
+  RPC's top-25 ranked matches expanded ±1 segment; the exact §6 prompt (plus the
+  same explicit-schema-block fix from slices 1 and 2); the documented citation
+  semantic-repair (empty citations on a non-"not found" answer gets one retry).
+- **Real finding from live testing:** the model sometimes attached a citation to
+  the "That does not appear in this meeting's transcript." answer itself --
+  self-contradictory in the UI (a clickable "Heard at 00:00" next to "this wasn't
+  said"). Not a case the doc's repair rule catches (that only covers the opposite:
+  a real answer with zero citations). Fixed with a small clamp in
+  `ask-controller.ts`: citations are forced empty whenever the answer is exactly
+  the not-found string, regardless of what the model returned -- same spirit as
+  `analysis-controller.ts`'s existing post-validation clamps.
+- `app/api/meetings/[id]/ask/route.ts` (new, `POST { question }`) and
+  `components/app/ask-panel.tsx` (real submit, loading state, error toasts) --
+  same shape as the email regenerate route/composer from slice 2.
+- **Live verification:** asked a real question with a real answer in the
+  transcript ("What's Brixton's job title?") through the actual signed-in browser
+  session -- got the correct answer with a correct citation (`00:21`), confirmed
+  via direct Supabase query that a real `ask_queries` row exists and
+  `usage_daily.ask_calls`/`ask_tokens` incremented (1 / 549) separately from
+  `llm_calls`/`llm_tokens`. A deliberately unanswerable question ("Did they agree
+  on a budget?") correctly returned the exact documented not-found string, not a
+  guess.
+- Verification: `npm run typecheck`, `lint`, `test` (45 tests, unchanged), `build`
+  all green.
+
+**M3 is now fully done** -- transcription, analysis, email draft, and ask are all
+real and verified live end to end for the first time in this project.
+
 ## 2026-07-29 (M3 slice 2) — real follow-up email draft, meetings reach "ready"
 
 **Done:** the second automatic step docs/ARCHITECTURE.md's state machine specifies

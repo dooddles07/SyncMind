@@ -11,6 +11,8 @@ const DAILY_AUDIO_SECONDS = Number(process.env.GROQ_DAILY_AUDIO_SECONDS ?? 28800
 const DAILY_ASR_CALLS = Number(process.env.GROQ_DAILY_ASR_CALLS ?? 2000);
 const DAILY_LLM_CALLS = Number(process.env.GROQ_DAILY_LLM_CALLS ?? 1000);
 const DAILY_LLM_TOKENS = Number(process.env.GROQ_DAILY_LLM_TOKENS ?? 100000);
+const DAILY_ASK_CALLS = Number(process.env.GROQ_DAILY_ASK_CALLS ?? 14400);
+const DAILY_ASK_TOKENS = Number(process.env.GROQ_DAILY_ASK_TOKENS ?? 500000);
 
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
@@ -30,11 +32,11 @@ export type QuotaCheck = { ok: true } | { ok: false; resumeAt: string };
 export async function checkAndReserve(
   supabase: SupabaseClient<Database>,
   userId: string,
-  projected: { audioSeconds?: number; llmTokens?: number },
+  projected: { audioSeconds?: number; llmTokens?: number; askTokens?: number },
 ): Promise<QuotaCheck> {
   const { data, error } = await supabase
     .from("usage_daily")
-    .select("audio_seconds, asr_calls, llm_calls, llm_tokens")
+    .select("audio_seconds, asr_calls, llm_calls, llm_tokens, ask_calls, ask_tokens")
     .eq("user_id", userId)
     .eq("day", todayUtc())
     .maybeSingle();
@@ -44,12 +46,16 @@ export async function checkAndReserve(
   const asrCalls = (data?.asr_calls ?? 0) + (projected.audioSeconds !== undefined ? 1 : 0);
   const llmCalls = (data?.llm_calls ?? 0) + (projected.llmTokens !== undefined ? 1 : 0);
   const llmTokens = (data?.llm_tokens ?? 0) + (projected.llmTokens ?? 0);
+  const askCalls = (data?.ask_calls ?? 0) + (projected.askTokens !== undefined ? 1 : 0);
+  const askTokens = (data?.ask_tokens ?? 0) + (projected.askTokens ?? 0);
 
   if (
     audioSeconds > DAILY_AUDIO_SECONDS ||
     asrCalls > DAILY_ASR_CALLS ||
     llmCalls > DAILY_LLM_CALLS ||
-    llmTokens > DAILY_LLM_TOKENS
+    llmTokens > DAILY_LLM_TOKENS ||
+    askCalls > DAILY_ASK_CALLS ||
+    askTokens > DAILY_ASK_TOKENS
   ) {
     return { ok: false, resumeAt: nextUtcMidnight() };
   }
@@ -63,7 +69,7 @@ export async function checkAndReserve(
  *  can never inflate or reset someone else's quota. */
 export async function recordUsage(
   supabase: SupabaseClient<Database>,
-  usage: { audioSeconds?: number; llmTokens?: number },
+  usage: { audioSeconds?: number; llmTokens?: number; askTokens?: number },
 ): Promise<void> {
   const { error } = await supabase.rpc("increment_usage_daily", {
     p_day: todayUtc(),
@@ -71,6 +77,8 @@ export async function recordUsage(
     p_asr_calls: usage.audioSeconds !== undefined ? 1 : 0,
     p_llm_calls: usage.llmTokens !== undefined ? 1 : 0,
     p_llm_tokens: usage.llmTokens ?? 0,
+    p_ask_calls: usage.askTokens !== undefined ? 1 : 0,
+    p_ask_tokens: usage.askTokens ?? 0,
   });
   if (error) throw error;
 }
