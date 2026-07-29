@@ -1,16 +1,24 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@/server/config/supabase-server";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+
+  const cookieStore = await cookies();
+  const rawNext = cookieStore.get("post_login_redirect")?.value;
+  // Must be an internal relative path -- never redirect wherever an arbitrary
+  // cookie value says.
+  const next = rawNext && rawNext.startsWith("/") ? rawNext : "/dashboard";
 
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      const response = NextResponse.redirect(`${origin}${next}`);
+      response.cookies.delete("post_login_redirect");
+      return response;
     }
   }
 

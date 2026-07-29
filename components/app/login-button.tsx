@@ -34,11 +34,17 @@ export function LoginButton() {
 
   async function signIn() {
     setPending(true);
+    // redirectTo must be the exact literal string registered in Supabase's Redirect
+    // URLs allow-list -- no query string. Carrying "next" there caused Supabase to
+    // silently reject the redirect and fall back to the bare Site URL instead. A
+    // short-lived cookie survives the whole Google -> Supabase -> us round trip
+    // without touching the URL Supabase validates.
+    document.cookie = `post_login_redirect=${encodeURIComponent(next)}; path=/; max-age=300; samesite=lax`;
     const supabase = createClient();
     const origin = window.location.origin;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}` },
+      options: { redirectTo: `${origin}/auth/callback` },
     });
   }
 
