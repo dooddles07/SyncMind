@@ -128,7 +128,7 @@ Ordered as a build sequence; each item is a real dependency of the next.
 | 2.7 | ~~README is wrong on its own front page~~ **Resolved** | Status section now states the real, live state (deployed at sync-mind-three.vercel.app, UI on fixtures, no backend) with the live URL linked. Dead `DESIGN-SYSTEM.md` link repointed to `app/globals.css`. Quickstart ungated — works today, doesn't need M0 to "land" since it substantially already has. |
 | 2.8 | ~~`ROADMAP.md` still references the deleted DESIGN-SYSTEM doc~~ **Resolved** | M0.4 and M1.2 (the only two actual references — M5 turned out not to have one) repointed to `app/globals.css` and marked done. |
 | 2.9 | ~~No tests~~ **Partially resolved** | Vitest installed, 28 real tests across every pure function in the codebase (`lib/types.ts`, `lib/export/ics.ts`, `lib/export/gmail.ts`), wired into `ci.yml`. Chunker offset math and Playwright E2E still open — both need code that doesn't exist yet (P1). |
-| 2.10 | No error monitoring | Sentry free tier, or skip it and rely on Vercel runtime logs (also $0, less useful). |
+| 2.10 | ~~No error monitoring~~ **Wired, pending a real DSN** | `@sentry/nextjs` installed, `instrumentation-client.ts` + `sentry.server.config.ts` + `sentry.edge.config.ts` + `instrumentation.ts` all added, `next.config.ts` wrapped. `app/error.tsx` and `app/global-error.tsx` both call `Sentry.captureException`. Explicitly `enabled: Boolean(dsn)` — safe no-op confirmed via a deliberate throw with no Sentry project created yet (build stays green with zero Sentry env vars set). You still need to create a free Sentry project and set `NEXT_PUBLIC_SENTRY_DSN` for it to actually report anywhere — same shape as the Groq-limits task. |
 
 ---
 
@@ -155,7 +155,7 @@ Ordered as a build sequence; each item is a real dependency of the next.
 | GitHub Actions | Keep | Public repo only. Heartbeat commit required (P0.2). |
 | Google OAuth / Gmail / Calendar | **Drop for MVP** | Restricted scope verification is not free; Testing mode expires tokens weekly. Replace with compose deep link + `.ics`. |
 | cron-job.org | **Add** | Free redundant pinger. |
-| Sentry | Optional | Free developer tier. |
+| Sentry | Optional, wired | Free developer tier (5k errors/month). Code is live; needs a project + DSN to actually report. |
 | Custom domain | Already rejected | Annual cost. `*.vercel.app` stands. |
 
 Nothing in the recommended stack requires a payment method at any step.
@@ -168,5 +168,5 @@ Nothing in the recommended stack requires a payment method at any step.
 2. ~~P2.6 connect Vercel~~ **Already done**, discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/).
 3. ~~P2.1, P2.2, P2.6, P2.7, P2.8~~ **All done.** Every "fix what's wrong" P2 item is closed — what's left is genuinely new build work.
 4. ~~P2.4, P2.5~~ **Done** — error/not-found UI and OG image/robots/sitemap shipped. The demo now looks finished when shared, and it already has a real URL to share.
-5. ~~P2.9~~ **Partially done** (Vitest + 28 tests; Playwright + chunker tests wait on P1). P1.1 → P1.13 in order — the real build, M1 through M3. P2.10 (monitoring) can slot in alongside or after.
+5. ~~P2.9~~ **Partially done** (Vitest + 28 tests; Playwright + chunker tests wait on P1). ~~P2.10~~ **Wired**, pending you creating a Sentry project. Every standalone P2 item is now closed or waiting on P1. P1.1 → P1.13 in order — the real build, M1 through M3, is what's left.
 6. P3.

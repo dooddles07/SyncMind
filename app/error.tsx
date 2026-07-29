@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -18,6 +19,7 @@ export default function Error({
     // Application logs record errors and codes, never transcript content or user data
     // (see docs/SECURITY-PRIVACY.md §6) — safe to log the bare error here.
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

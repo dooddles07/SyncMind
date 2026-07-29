@@ -4,6 +4,59 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — Sentry error monitoring wired
+
+**Done:** P2.10 from `docs/GAP-ANALYSIS.md`. Last standalone P2 item — everything past
+this is P1, the real backend.
+
+Checked Sentry's current docs live before building (SDK conventions changed between
+majors): the Next.js 15 App Router convention is `instrumentation-client.ts`, not the
+older `sentry.client.config.ts`. Installed `@sentry/nextjs@10.68.0` (current, compatible
+with Next `^15.0.0`).
+
+- `instrumentation-client.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts` —
+  all three read one var, `NEXT_PUBLIC_SENTRY_DSN`, with `enabled: Boolean(dsn)`
+  explicit rather than relying on implicit no-op behavior. Error capture only, no
+  performance tracing — stays clear of Sentry's separate, smaller performance quota.
+- `instrumentation.ts` — registers the server/edge config by runtime, exports
+  `onRequestError = Sentry.captureRequestError` (server/middleware error capture — a
+  no-op today since `app/api/**` barely exists, starts earning its keep once P1 adds
+  real server code).
+- `next.config.ts` wrapped with `withSentryConfig`. No Sentry project exists yet, so
+  `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` are all unset —
+  `sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN }` set explicitly rather than
+  trusting undocumented graceful-failure behavior when the token's missing.
+- `app/error.tsx` and `app/global-error.tsx` (from the P2.4 pass) both now call
+  `Sentry.captureException(error)` alongside the existing `console.error`.
+  `global-error.tsx` needed its signature widened to receive `error`, not just `reset`.
+- Build surfaced one real actionable warning: Sentry requires exporting
+  `onRouterTransitionStart` for navigation breadcrumbs (context for error reports, not
+  performance tracing) — added, warning gone on rebuild.
+- Corrected `.env.example`/`docs/DEPLOYMENT.md`: the old `SENTRY_DSN` was marked
+  server-only, which is backwards — a DSN isn't a secret (Sentry's own docs confirm
+  it's meant to be embedded client-side), so it's `NEXT_PUBLIC_SENTRY_DSN` now. Added
+  `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` for source-map upload — those *are*
+  build-time-only and sensitive.
+
+**Verified the disabled path is actually safe, not just assumed:** temporarily added a
+module-level `throw` to `app/(app)/settings/page.tsx`, confirmed via Playwright the
+500 and error boundary behaved correctly with no Sentry-related console errors — proof
+`Sentry.captureException` doesn't itself throw when `enabled: false`. Reverted, diff
+confirmed clean. Full rebuild with zero Sentry env vars set stays green, same 13
+routes, no warnings.
+
+**Honest tradeoff, noted not hidden:** shared client JS grew from 103 kB to 185 kB —
+that's the Sentry browser SDK's real cost, not a bug. Worth it for actually finding out
+about live bugs; flagging in case bundle size becomes a complaint later.
+
+**Still open:** you need to create a free Sentry project (sentry.io, no card) and set
+`NEXT_PUBLIC_SENTRY_DSN` in Vercel for this to report anywhere — same shape as the
+Groq-limits task. Until then it's a correctly-wired no-op.
+
+**Every standalone P2 item is now closed or waiting on P1.** What's left is P1 itself.
+
+---
+
 ## 2026-07-28 — Vitest installed, 28 real tests, wired into CI
 
 **Done:** P2.9 from `docs/GAP-ANALYSIS.md` (partial — the parts of it that exist in

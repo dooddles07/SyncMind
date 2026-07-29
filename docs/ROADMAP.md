@@ -126,7 +126,7 @@ consent screen, zero verification, zero expiry.
 | 5.7 | Full accessibility pass: contrast, focus order, keyboard path, screen-reader labels, reduced motion |
 | 5.8 | Responsive pass at 375 / 768 / 1024 / 1440 |
 | 5.9 | Playwright E2E covering the full happy path |
-| 5.10 | Sentry wired; error boundaries with useful recovery |
+| 5.10 | **Sentry SDK + error boundaries done** (`docs/GAP-ANALYSIS.md` P2.10, shipped early). Remaining: create the actual Sentry project and set `NEXT_PUBLIC_SENTRY_DSN` in Vercel — a deliberate manual step, same shape as the Groq console check. |
 | 5.11 | Manual launch checklist (below) |
 | 5.12 | README polish, production deploy, share the live link |
 

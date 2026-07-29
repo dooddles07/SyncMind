@@ -37,7 +37,8 @@ Copy `.env.example` to `.env.local` for local work; set the same keys in Vercel 
 | `GROQ_DAILY_ASR_CALLS` | default `60` | server |
 | `GROQ_DAILY_LLM_CALLS` | default `80` | server |
 | `GROQ_DAILY_LLM_TOKENS` | default `400000` | server |
-| `SENTRY_DSN` | Sentry project settings (optional) | server |
+| `NEXT_PUBLIC_SENTRY_DSN` | Sentry project settings (optional) | client — a DSN isn't a secret, Sentry's own docs confirm it's meant to be embedded client-side |
+| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | Sentry org/project settings (optional, for source-map upload) | **build-time only**, never in client code |
 
 Only `NEXT_PUBLIC_*` variables may appear in client code. A server-only key referenced from a `"use client"` file is a shipped secret — CI greps for this and fails the build.
 
