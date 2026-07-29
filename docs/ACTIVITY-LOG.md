@@ -4,6 +4,84 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (M2 slice 1) — real transcription: quota, Groq client, /api/pipeline/advance
+
+**Done:** the next real feature after the upload pipeline — a stuck `"transcribing"`
+meeting can now actually get transcribed. Scoped tightly to transcription only, per
+`docs/AI-PIPELINE.md` §2 and `docs/ARCHITECTURE.md` §3.3/§7/§8, which already fully
+specified the request shape, offset/seam math, retry ladder, and quota model — nothing
+here was a new design decision.
+
+- `lib/quota.ts` — kept at that exact path (not `server/config/`) as a deliberate,
+  documented exception: `CLAUDE.md` — the user's own project instructions, outranking
+  the `server/` convention locked mid-project — already names this path directly.
+  `checkAndReserve`/`recordUsage` against the real `GROQ_DAILY_*` ceilings confirmed
+  earlier this project.
+- **Real technical finding while building it:** Supabase-js's `.upsert()` can't
+  express "add to the existing value" atomically — it overwrites on conflict, it
+  doesn't increment. `AI-PIPELINE.md` §7's documented upsert SQL needed to become an
+  actual Postgres function, not something pure Supabase-js calls could do. Added a
+  10th migration, `increment_usage_daily` — `security invoker` (not definer): the row
+  it writes is exactly what the existing `usage_daily` RLS policy already lets the
+  caller write directly, so there's no privilege to elevate, and it derives the user
+  from `auth.uid()` internally rather than trusting a passed-in id, so nobody can
+  inflate or reset someone else's quota through it. Verified via direct query:
+  function exists, `prosecdef: false` confirms `security invoker` took effect.
+- `server/config/groq.ts` — raw `fetch`, no SDK dependency added (Groq's REST API
+  doesn't need one for a single endpoint, and `CLAUDE.md` says no external libraries
+  unless necessary). Full retry ladder from `ARCHITECTURE.md` §7: 429 reads
+  `retry-after`, retries once in-request if under 20s else throws a typed
+  `GroqRateLimitError` the controller turns into `quota_blocked`; 5xx/network failure
+  gets 3 attempts with the documented exponential backoff (2s/6s/18s) before
+  surfacing.
+- `server/utils/transcript-stitch.ts` — the offset-shift + seam-dedup arithmetic,
+  pure function, no Supabase import. **Unit tested with 7 synthetic fixtures**
+  (`transcript-stitch.test.ts`) covering first-chunk (no dedup), fully-covered
+  duplicate segments, fully-new segments, and both directions of a boundary-straddling
+  segment (kept when >50% past the seam, dropped at exactly 50%) — `AI-PIPELINE.md`
+  §2 explicitly calls this out as needing a unit test, not a model call, to verify.
+- `server/models/audio-chunk-model.ts` — `claimNextPendingChunk` uses a
+  select-then-conditional-update pattern (not a real Postgres advisory lock, which
+  Supabase-js can't express directly without another RPC) as the concurrency guard:
+  if a concurrent `advance` call already claimed the chunk, the conditional update
+  affects zero rows and this returns `null`, which the controller treats exactly like
+  `ARCHITECTURE.md` §7's documented "advisory lock contention → return current state,
+  not an error." `releaseChunk` puts a claimed-then-quota-blocked chunk back to
+  `pending` so a later call retries it instead of leaving it stuck in `processing`
+  forever.
+- `server/controllers/pipeline-controller.ts` — `advance()` does exactly one unit of
+  work and returns, per the documented unit-of-work table: claim a pending chunk,
+  quota-check, download from Storage (the caller's own client — the existing "own
+  audio read" policy already allows it, no service-role needed), transcribe, stitch,
+  insert, mark done, record usage. When no chunks remain, flips the meeting to
+  `"analyzing"` — a real state the UI already renders, and where this honestly stops
+  until the analysis pass (M3) exists to advance it further.
+- `app/api/pipeline/advance/route.ts` (`POST`), `app/api/meetings/[id]/status/route.ts`
+  (`GET`, the documented poll target, same response shape) — both thin delegators,
+  both auth-checked like every other route this session.
+- `components/app/pipeline-poller.tsx` — client component replacing the static
+  `StatusStepper` on the meeting page. Polls `advance` every ~2s while
+  `status === "transcribing"` (the documented browser-drives-the-pipeline model —
+  closing the tab pauses work, it never fails it, since all state lives in Postgres),
+  stops the moment status changes to anything else.
+
+**Verified:** `npm run typecheck`, `lint`, `test` (37 now, up from 30 — the 7 new
+stitching tests), `build` all green. New routes confirmed in the build output.
+`GROQ_API_KEY` confirmed empty in `.env.local` (checked without exposing it, same
+length-probe method as every other key check this session) — real end-to-end
+transcription against the "Introduction Video" meeting from last session needs it,
+same external-key shape as every other provider this project uses.
+
+**Not yet verified live:** the actual Groq call, the quota accounting writing a real
+row, and the retry ladder under a real 429/5xx (hard to trigger organically without
+deliberately abusing the free tier, which isn't worth doing just to prove a
+well-specified, code-reviewed retry loop). Flagged honestly rather than assumed.
+
+**Next:** once transcription is verified live, minutes/actions/email (M3) is the
+remaining AI-layer chunk — needs Zod schemas and structured LLM output, not built yet.
+
+---
+
 ## 2026-07-29 (production incident) — live site down: Vercel env vars never synced
 
 **What happened:** the previous commit (real upload pipeline + `middleware.ts`)

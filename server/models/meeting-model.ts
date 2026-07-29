@@ -53,6 +53,31 @@ export async function updateMeetingStatus(
   if (error) throw error;
 }
 
+export async function markMeetingFailed(
+  supabase: SupabaseClient<Database>,
+  id: string,
+  errorCode: string,
+  errorMessage: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("meetings")
+    .update({ status: "failed", error_code: errorCode, error_message: errorMessage })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function markMeetingQuotaBlocked(
+  supabase: SupabaseClient<Database>,
+  id: string,
+  resumeAt: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("meetings")
+    .update({ status: "quota_blocked", resume_at: resumeAt })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 /** All-or-nothing for this pass: the client only calls this once every signed-URL
  *  PUT has already succeeded, so "uploaded" is a true statement about every chunk
  *  at once, not a partial/incremental status. Live per-chunk progress during the

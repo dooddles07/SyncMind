@@ -1,0 +1,65 @@
+// Free-tier accounting (docs/ARCHITECTURE.md section 8). Deliberately kept at this
+// path rather than server/config/ -- CLAUDE.md (the user's own project instructions,
+// which take precedence over the server/ convention locked mid-project) already
+// names "lib/quota.ts" directly. It is server-only despite living in lib/: it reads
+// server-only env ceilings and writes usage_daily with the caller's own Supabase
+// client. Never import this from a "use client" file.
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/server/models/database.types";
+
+const DAILY_AUDIO_SECONDS = Number(process.env.GROQ_DAILY_AUDIO_SECONDS ?? 28800);
+const DAILY_ASR_CALLS = Number(process.env.GROQ_DAILY_ASR_CALLS ?? 2000);
+
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function nextUtcMidnight(): string {
+  const now = new Date();
+  const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  return midnight.toISOString();
+}
+
+export type QuotaCheck = { ok: true } | { ok: false; resumeAt: string };
+
+/** Checks projected spend against today's ceiling before the upstream call, so a
+ *  heavy day produces the designed quota_blocked state rather than a raw Groq 429.
+ *  Does not itself reserve/increment -- call recordUsage after the call succeeds. */
+export async function checkAndReserve(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  projected: { audioSeconds: number },
+): Promise<QuotaCheck> {
+  const { data, error } = await supabase
+    .from("usage_daily")
+    .select("audio_seconds, asr_calls")
+    .eq("user_id", userId)
+    .eq("day", todayUtc())
+    .maybeSingle();
+  if (error) throw error;
+
+  const audioSeconds = (data?.audio_seconds ?? 0) + projected.audioSeconds;
+  const asrCalls = (data?.asr_calls ?? 0) + 1;
+
+  if (audioSeconds > DAILY_AUDIO_SECONDS || asrCalls > DAILY_ASR_CALLS) {
+    return { ok: false, resumeAt: nextUtcMidnight() };
+  }
+  return { ok: true };
+}
+
+/** Atomic upsert -- docs/AI-PIPELINE.md section 7's exact shape, so two concurrent
+ *  calls for the same user/day both land instead of one clobbering the other. The
+ *  Postgres function derives the user from auth.uid() itself (supabase/migrations/
+ *  ..._quota_increment_function.sql) rather than trusting a passed-in id, so a caller
+ *  can never inflate or reset someone else's quota. */
+export async function recordUsage(
+  supabase: SupabaseClient<Database>,
+  usage: { audioSeconds: number },
+): Promise<void> {
+  const { error } = await supabase.rpc("increment_usage_daily", {
+    p_day: todayUtc(),
+    p_audio_seconds: usage.audioSeconds,
+    p_asr_calls: 1,
+  });
+  if (error) throw error;
+}

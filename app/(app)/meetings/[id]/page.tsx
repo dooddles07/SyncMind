@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { AskPanel } from "@/components/app/ask-panel";
 import { EmailComposer } from "@/components/app/email-composer";
 import { NotesPanel } from "@/components/app/notes-panel";
-import { StatusStepper } from "@/components/app/status-stepper";
+import { PipelinePoller } from "@/components/app/pipeline-poller";
 import { TodoTable } from "@/components/app/todo-table";
 import { TranscriptPanel } from "@/components/app/transcript";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,11 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <StatusStepper status={meeting.status} detail={meeting.note ?? statusCopy[meeting.status].hint} />
+      <PipelinePoller
+        meetingId={meeting.id}
+        initialStatus={meeting.status}
+        initialDetail={meeting.note ?? statusCopy[meeting.status].hint}
+      />
 
       <Tabs defaultValue="notes">
         <TabsList>

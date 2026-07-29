@@ -1,0 +1,100 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/server/models/database.types";
+
+export type AudioChunkRow = Database["public"]["Tables"]["audio_chunks"]["Row"];
+
+/**
+ * Claims the lowest-index pending chunk for a meeting via a conditional update
+ * (status must still be "pending" at write time). If a concurrent advance call wins
+ * the race, this returns null -- the documented behavior for advisory-lock
+ * contention (docs/ARCHITECTURE.md section 7: "return current state with 200, not
+ * an error") without needing a real Postgres advisory lock for this first pass.
+ */
+export async function claimNextPendingChunk(
+  supabase: SupabaseClient<Database>,
+  meetingId: string,
+): Promise<AudioChunkRow | null> {
+  const { data: candidate, error: selectError } = await supabase
+    .from("audio_chunks")
+    .select("*")
+    .eq("meeting_id", meetingId)
+    .eq("status", "pending")
+    .order("chunk_index", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (selectError) throw selectError;
+  if (!candidate) return null;
+
+  const { data: claimed, error: updateError } = await supabase
+    .from("audio_chunks")
+    .update({ status: "processing" })
+    .eq("id", candidate.id)
+    .eq("status", "pending")
+    .select("*")
+    .maybeSingle();
+  if (updateError) throw updateError;
+  return claimed;
+}
+
+export async function markChunkDone(supabase: SupabaseClient<Database>, chunkId: string): Promise<void> {
+  const { error } = await supabase.from("audio_chunks").update({ status: "done" }).eq("id", chunkId);
+  if (error) throw error;
+}
+
+/** Only ever called on a chunk this caller already holds an exclusive "processing"
+ *  claim on, so a plain read-then-write for the attempt count is safe -- no second
+ *  writer can be touching this row at the same time. */
+export async function markChunkFailed(
+  supabase: SupabaseClient<Database>,
+  chunkId: string,
+  errorMessage: string,
+): Promise<{ attempts: number }> {
+  const { data: current, error: readError } = await supabase
+    .from("audio_chunks")
+    .select("attempts")
+    .eq("id", chunkId)
+    .single();
+  if (readError) throw readError;
+
+  const attempts = current.attempts + 1;
+  const { error } = await supabase
+    .from("audio_chunks")
+    .update({ status: "failed", attempts, last_error: errorMessage })
+    .eq("id", chunkId);
+  if (error) throw error;
+  return { attempts };
+}
+
+/** Puts a claimed chunk back to "pending" -- used when quota blocks the call after
+ *  the chunk was already claimed, so a later advance (after the quota resets) picks
+ *  it up again instead of leaving it stuck in "processing" forever. */
+export async function releaseChunk(supabase: SupabaseClient<Database>, chunkId: string): Promise<void> {
+  const { error } = await supabase.from("audio_chunks").update({ status: "pending" }).eq("id", chunkId);
+  if (error) throw error;
+}
+
+export async function hasPendingChunks(
+  supabase: SupabaseClient<Database>,
+  meetingId: string,
+): Promise<boolean> {
+  const { count, error } = await supabase
+    .from("audio_chunks")
+    .select("*", { count: "exact", head: true })
+    .eq("meeting_id", meetingId)
+    .in("status", ["pending", "processing"]);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
+export async function countDoneChunks(
+  supabase: SupabaseClient<Database>,
+  meetingId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("audio_chunks")
+    .select("*", { count: "exact", head: true })
+    .eq("meeting_id", meetingId)
+    .eq("status", "done");
+  if (error) throw error;
+  return count ?? 0;
+}

@@ -571,7 +571,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_usage_daily: {
+        Args: { p_asr_calls: number; p_audio_seconds: number; p_day: string }
+        Returns: undefined
+      }
     }
     Enums: {
       action_priority: "low" | "medium" | "high"
