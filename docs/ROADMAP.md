@@ -16,7 +16,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | 0.7 | `.env.example` complete; `.gitignore`; local `.env.local` verified |
 | 0.8 | Vercel project connected, preview deploys on PR |
 | 0.9 | `ci.yml` — **done**: typecheck + lint + build on every push and PR, all green. Unit step still waits on Vitest (not configured). `keepalive.yml` — **done**: every 3 days, pings `/api/health` and self-commits a heartbeat so GitHub never auto-disables it from 60 days of repo inactivity, independent of deploy state. See `docs/GAP-ANALYSIS.md` P0.2. |
-| 0.10 | Vitest and Playwright configured with one passing test each |
+| 0.10 | **Vitest done**: 28 tests across `lib/types.ts`, `lib/export/ics.ts`, `lib/export/gmail.ts` — every pure function that exists in the codebase so far. Playwright still not configured; nothing is wired to anything real yet for an E2E happy-path to meaningfully exercise. |
 | 0.11 | **Done**: real `GROQ_DAILY_*` values confirmed at `console.groq.com` → Limits and set in `.env.example`, logged in ACTIVITY-LOG. `lib/quota.ts` itself still needs building (M2.9) — see AI-PIPELINE §7 for two gaps found (per-minute and per-hour caps, not just daily) it must account for |
 
 **Exit:** an empty themed app deploys to Vercel, connects to Supabase, and CI is green.

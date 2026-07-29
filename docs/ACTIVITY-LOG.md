@@ -4,6 +4,42 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — Vitest installed, 28 real tests, wired into CI
+
+**Done:** P2.9 from `docs/GAP-ANALYSIS.md` (partial — the parts of it that exist in
+code). No test runner existed in this repo before now. `docs/ARCHITECTURE.md` §10
+names the eventual unit-test surface — chunk offset math, JSON schema validation,
+`.ics`/`.srt` generation, quota arithmetic — but only one of those exists today: the
+`.ics` generator. Scoped to what's real: `lib/export/ics.ts`, `lib/export/gmail.ts`,
+and the pure helpers in `lib/types.ts`.
+
+- `vitest.config.ts` — reuses the `@/*` path alias from `tsconfig.json`, no jsdom
+  (nothing under test touches the DOM).
+- `lib/types.test.ts` (9 tests) — `formatTimecode`, `formatDuration`, `isOverdue`
+  (including the documented `status === "done"` short-circuit), `formatDate`.
+- `lib/export/ics.test.ts` (11 tests) — `buildIcs`'s RFC 5545 output: DTEND is the day
+  *after* the due date (all-day events are exclusive-ended — tested including a
+  month-boundary rollover), comma/semicolon/backslash escaping, and line-folding at 75
+  octets (verified by reconstructing the original line from the folded output, not by
+  hand-computing fold boundaries). Plus `slugify` and `datedTodos`.
+- `lib/export/gmail.test.ts` (8 tests) — URL encoding for both the Gmail deep link and
+  `mailto:` fallback, the `MAX_COMPOSE_URL` threshold, and `asPlainText`'s exact output
+  shape (the copy button depends on this being right).
+- `npm run test` → `vitest run` (single pass, CI-friendly). Wired into
+  `.github/workflows/ci.yml` as a fourth step: typecheck → lint → test → build.
+
+**Verified the tests actually test something:** flipped the comparison operator in
+`isOverdue` (`<` → `>`), reran — 2 tests failed with the expected assertion mismatches,
+confirming they exercise real logic rather than trivially passing. Reverted.
+
+All 28 tests pass; `npm run typecheck`, `npm run lint`, `npm run build` all stay green.
+
+**Still open:** chunker offset math and Playwright E2E both need code that doesn't
+exist yet — P1. P2.10 (error monitoring) is the last standalone P2 item; everything
+else from here is P1, the real backend.
+
+---
+
 ## 2026-07-28 — Error/not-found UI + OG image, robots, sitemap
 
 **Done:** P2.4 + P2.5 from `docs/GAP-ANALYSIS.md`.
