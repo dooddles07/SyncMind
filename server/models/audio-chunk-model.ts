@@ -4,13 +4,23 @@ import type { Database } from "@/server/models/database.types";
 export type AudioChunkRow = Database["public"]["Tables"]["audio_chunks"]["Row"];
 
 /**
- * Claims the lowest-index pending chunk for a meeting via a conditional update
- * (status must still be "pending" at write time). If a concurrent advance call wins
- * the race, this returns null -- the documented behavior for advisory-lock
- * contention (docs/ARCHITECTURE.md section 7: "return current state with 200, not
- * an error") without needing a real Postgres advisory lock for this first pass.
+ * Claims the lowest-index chunk ready to transcribe for a meeting via a conditional
+ * update (status must still be "uploaded" at write time). chunk_status has 5 values
+ * (supabase/migrations, enums.sql): "pending" means not yet uploaded -- set at
+ * meeting creation, cleared by finalizeUpload once every signed-URL PUT succeeds,
+ * which is what flips it to "uploaded". Transcription's job starts from "uploaded",
+ * never "pending" -- an earlier version of this function queried "pending" here,
+ * found nothing (every real chunk is already "uploaded" by the time transcription
+ * can run), and silently treated "no work found" as "everything's done", skipping
+ * transcription entirely. Caught via direct DB verification, not assumed correct
+ * from the UI alone.
+ *
+ * If a concurrent advance call wins the race, this returns null -- the documented
+ * behavior for advisory-lock contention (docs/ARCHITECTURE.md section 7: "return
+ * current state with 200, not an error") without needing a real Postgres advisory
+ * lock for this first pass.
  */
-export async function claimNextPendingChunk(
+export async function claimNextChunkToTranscribe(
   supabase: SupabaseClient<Database>,
   meetingId: string,
 ): Promise<AudioChunkRow | null> {
@@ -18,7 +28,7 @@ export async function claimNextPendingChunk(
     .from("audio_chunks")
     .select("*")
     .eq("meeting_id", meetingId)
-    .eq("status", "pending")
+    .eq("status", "uploaded")
     .order("chunk_index", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -29,7 +39,7 @@ export async function claimNextPendingChunk(
     .from("audio_chunks")
     .update({ status: "processing" })
     .eq("id", candidate.id)
-    .eq("status", "pending")
+    .eq("status", "uploaded")
     .select("*")
     .maybeSingle();
   if (updateError) throw updateError;
@@ -65,15 +75,15 @@ export async function markChunkFailed(
   return { attempts };
 }
 
-/** Puts a claimed chunk back to "pending" -- used when quota blocks the call after
+/** Puts a claimed chunk back to "uploaded" -- used when quota blocks the call after
  *  the chunk was already claimed, so a later advance (after the quota resets) picks
  *  it up again instead of leaving it stuck in "processing" forever. */
 export async function releaseChunk(supabase: SupabaseClient<Database>, chunkId: string): Promise<void> {
-  const { error } = await supabase.from("audio_chunks").update({ status: "pending" }).eq("id", chunkId);
+  const { error } = await supabase.from("audio_chunks").update({ status: "uploaded" }).eq("id", chunkId);
   if (error) throw error;
 }
 
-export async function hasPendingChunks(
+export async function hasChunksAwaitingTranscription(
   supabase: SupabaseClient<Database>,
   meetingId: string,
 ): Promise<boolean> {
@@ -81,7 +91,7 @@ export async function hasPendingChunks(
     .from("audio_chunks")
     .select("*", { count: "exact", head: true })
     .eq("meeting_id", meetingId)
-    .in("status", ["pending", "processing"]);
+    .in("status", ["uploaded", "processing"]);
   if (error) throw error;
   return (count ?? 0) > 0;
 }

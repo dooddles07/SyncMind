@@ -2,9 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { checkAndReserve, recordUsage } from "@/lib/quota";
 import { GroqRateLimitError, transcribeChunk } from "@/server/config/groq";
 import {
-  claimNextPendingChunk,
+  claimNextChunkToTranscribe,
   countDoneChunks,
-  hasPendingChunks,
+  hasChunksAwaitingTranscription,
   markChunkDone,
   markChunkFailed,
   releaseChunk,
@@ -69,10 +69,10 @@ export async function advance(
     return currentStatus(supabase, meetingId);
   }
 
-  const chunk = await claimNextPendingChunk(supabase, meetingId);
+  const chunk = await claimNextChunkToTranscribe(supabase, meetingId);
 
   if (!chunk) {
-    if (await hasPendingChunks(supabase, meetingId)) {
+    if (await hasChunksAwaitingTranscription(supabase, meetingId)) {
       // Lost the claim race this time -- someone else (or a retrying client) is
       // already handling the remaining work. Not an error.
       return currentStatus(supabase, meetingId);
