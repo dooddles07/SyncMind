@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { fontVariables } from "./fonts";
 import { MotionProvider } from "@/components/motion-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </a>
           <MotionProvider>{children}</MotionProvider>
           <Toaster />
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>

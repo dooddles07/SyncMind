@@ -4,6 +4,26 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — Vercel Web Analytics wired (GAP-ANALYSIS P3)
+
+**Done:** confirmed real current Hobby free-tier limit by fetching Vercel's
+own published pricing page (`vercel.com/docs/analytics/limits-and-pricing`,
+last updated 2026-06-26) instead of guessing — same rigor as the Groq limits
+check. Result: 50,000 events/month included on Hobby, resets each billing
+cycle, no overage purchase available (collection pauses after a 3-day grace
+period once exceeded).
+
+- Installed `@vercel/analytics`, added `<Analytics />` to `app/layout.tsx`
+  next to the existing `<Toaster />`. No env var needed — auto-detects the
+  Vercel deployment context, no-ops locally.
+- `typecheck`/`lint`/`test` (56/56)/`build` all green.
+- Real event confirmation needs the live Vercel dashboard after deploy +
+  real traffic — same "code ships now, external check is a later step" shape
+  as the Sentry DSN item.
+- GAP-ANALYSIS.md P3 list updated. One P3 item remains: eval fixture set.
+
+---
+
 ## 2026-07-29 — real bug: Transcript tab crash, wrong error "Go home" target
 
 **Done:** user-reported crash on production, not a planned slice. Opening the

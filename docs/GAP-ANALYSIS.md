@@ -150,7 +150,7 @@ land under `server/`, organized by layer, not by domain.
 - ~~Real share-link creation with revoke.~~ **Done** — see 1.10/1.11.
 - ~~Hard delete verified against the Supabase dashboard.~~ **Done, both levels** — account-level (1.11) and now per-meeting: `DELETE /api/meetings/:id`, `server/controllers/meeting-controller.ts`'s `deleteMeeting`, `components/app/delete-meeting-button.tsx`. Verified live on a disposable meeting: real Supabase row and Storage object both confirmed gone, the real meeting used for every other verification this session untouched.
 - Eval fixture set and `npm run eval`.
-- Analytics: Vercel Web Analytics has a free Hobby tier; confirm the current event cap before wiring.
+- ~~Analytics: Vercel Web Analytics has a free Hobby tier; confirm the current event cap before wiring.~~ **Wired.** Confirmed real current limit via Vercel's own published pricing page (`vercel.com/docs/analytics/limits-and-pricing`, last updated 2026-06-26): Hobby = 50,000 events/month included, resets each billing cycle, collection pauses after a 3-day grace period once exceeded (no overage purchase on Hobby). `@vercel/analytics` installed, `<Analytics />` added to `app/layout.tsx`. Auto-detects the Vercel deployment context, no env var needed, no-ops locally. `typecheck`/`lint`/`test`/`build` all green. Same shape as the Sentry DSN item above — code ships now, confirming real events land needs the user's Vercel dashboard after deploy + real traffic.
 
 ---
 
