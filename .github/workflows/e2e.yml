@@ -1,0 +1,38 @@
+name: E2E
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      E2E_TEST_SECRET: ${{ secrets.E2E_TEST_SECRET }}
+      # Never actually called -- server/config/groq.ts's GROQ_BASE_URL override
+      # points every real call at tests/e2e/mock-groq-server.ts instead. Still
+      # required non-empty: requireApiKey() throws before any request goes out.
+      GROQ_API_KEY: e2e-mock-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm run test:e2e
+        env:
+          CI: true
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

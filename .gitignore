@@ -52,6 +52,10 @@ Thumbs.db
 *.mp4
 *.mov
 !tests/fixtures/**/*.webm
+!tests/e2e/fixtures/**/*.wav
+
+# E2E: saved session cookies from the test-only sign-in stub, never commit
+tests/e2e/.auth/
 
 # ts
 *.tsbuildinfo

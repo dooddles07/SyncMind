@@ -5,6 +5,11 @@
 // here is a new design decision, just following what's written down.
 import type { WhisperSegment } from "@/server/utils/transcript-stitch";
 
+/** Overridable so E2E tests can point this at a local mock server instead of
+ *  spending real Groq tokens -- unset in every real deployment, so this is a
+ *  no-op there (tests/e2e/mock-groq-server.ts). */
+const GROQ_BASE_URL = process.env.GROQ_BASE_URL ?? "https://api.groq.com";
+
 const WHISPER_MODEL = "whisper-large-v3-turbo";
 const ANALYSIS_MODEL = "llama-3.3-70b-versatile";
 export const ASK_MODEL = "llama-3.1-8b-instant";
@@ -92,7 +97,7 @@ export async function transcribeChunk(
     form.append("temperature", "0");
     if (prompt) form.append("prompt", prompt);
 
-    return fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    return fetch(`${GROQ_BASE_URL}/openai/v1/audio/transcriptions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
@@ -129,7 +134,7 @@ export async function runStructuredCompletion(
   const apiKey = requireApiKey();
 
   const response = await requestWithRetryLadder(() =>
-    fetch("https://api.groq.com/openai/v1/chat/completions", {
+    fetch(`${GROQ_BASE_URL}/openai/v1/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,

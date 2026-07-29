@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "eval": "tsx --env-file=.env.local scripts/eval.ts"
   },
   "dependencies": {
@@ -43,6 +44,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",

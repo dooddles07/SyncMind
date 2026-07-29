@@ -4,6 +4,71 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — Playwright E2E, real full-flow spec (GAP-ANALYSIS 2.9, last test gap)
+
+**Done:** the last real doc-vs-code gap. `docs/ARCHITECTURE.md` §10 specifies
+`sign-in stub → upload a 30s fixture → poll to ready → edit an action →
+generate share link → verify public page. External APIs mocked at the
+network layer.` — nothing existed. Full scope built, per the user's explicit
+choice over two smaller options (auth-stub-only, or public-pages-only).
+
+Two earlier attempts this session to fake an authenticated Playwright
+session both failed on *how* the session was obtained (PKCE/fragment
+mismatch reusing the real OAuth callback; a module-resolution issue running
+a script outside the project). Neither problem was fundamental — confirmed
+by reading `middleware.ts` and every Supabase client and finding they're
+stock `@supabase/ssr`, no PKCE-specific logic anywhere except the callback
+route itself. So the real fix was to stop going through that route:
+
+- `server/controllers/test-auth-controller.ts` + `app/api/test/login/route.ts`
+  — a test-only sign-in stub, double-gated (404s in production, 404s without
+  a matching `E2E_TEST_SECRET` header). Self-provisions a seeded
+  `e2e@syncmind.local` user idempotently, mints a session via the admin
+  API's `generateLink` + server-side `verifyOtp` (no browser fragment
+  involved — that was never the part that failed before), then calls the
+  request-scoped SSR client's own `auth.setSession()` so the SDK writes
+  correctly-formatted cookies itself instead of anything hand-crafted.
+- `server/config/groq.ts` gained a `GROQ_BASE_URL` override (default
+  unchanged, zero effect outside E2E). `tests/e2e/mock-groq-server.ts` — a
+  plain Node `http` server, no new dependency, serves canned
+  transcription/analysis/email responses that validate against the real
+  `AnalysisSchema`/`EmailSchema`, distinguishing analysis vs. email calls by
+  system-prompt substring. Zero real Groq spend per E2E run.
+- `tests/e2e/fixtures/sample.wav` — a tiny (47KB) synthetically-generated
+  WAV (a 3s 440Hz tone, written as raw bytes by a one-off script, not
+  recorded or downloaded).
+- `playwright.config.ts`: chromium only, two `webServer` entries (the mock
+  Groq server, then `next dev` pointed at it), `globalSetup` signs in once
+  via the stub and saves `storageState`, reused by every spec.
+- `tests/e2e/full-flow.spec.ts`: real upload through real client-side
+  ffmpeg.wasm chunking, polls the real `/api/meetings/:id/status` endpoint
+  to `"ready"`, then a real finding — there's no inline action-item edit UI
+  anywhere on the meeting page (`TodoTable` is read-only, `.ics`-download
+  only); the only real edit affordance in the whole app is the `/tasks`
+  board's status `<select>`. The spec uses that and says so explicitly,
+  rather than silently reinterpreting the doc's "edit an action" to fit.
+  Then a real share link, verified in a **fresh, unauthenticated** browser
+  context against the actual public page.
+- Ran twice against the live Supabase project, both passed (~50s each,
+  first run surfaced the enclosing test's default 30s timeout being too
+  short for a real chunk→transcribe→analyze→email pipeline — fixed by
+  raising `playwright.config.ts`'s `timeout` to 150s). Verified via direct
+  query afterward that the disposable meeting is fully gone (teardown reuses
+  the real `deleteMeeting` controller) and the real "Introduction Video"
+  meeting is untouched.
+- `.github/workflows/e2e.yml` added, `pull_request` → `main` per the doc's
+  stated cadence. **Cannot run in CI yet** — needs
+  `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`/
+  `SUPABASE_SERVICE_ROLE_KEY`/`E2E_TEST_SECRET` added as real GitHub repo
+  secrets, which only the user can do (confirmed via reading every existing
+  workflow that only `CRON_SECRET` exists as a repo secret today). Flagged,
+  not silently assumed to work.
+- `typecheck`/`lint`/`test` (61/61)/`build` all green.
+- `docs/GAP-ANALYSIS.md` 2.9 and the top-of-doc summary table (stale since
+  before Vitest existed) both updated.
+
+---
+
 ## 2026-07-29 — Real `POST /api/pipeline/retry` (GAP-ANALYSIS 1.4, last P1 item)
 
 **Done:** closed the one remaining P1 gap. The old note claiming `advance()`
