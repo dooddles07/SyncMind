@@ -10,6 +10,7 @@ import {
   markChunkDone,
   markChunkFailed,
   releaseChunk,
+  resetFailedChunksToUploaded,
 } from "@/server/models/audio-chunk-model";
 import type { Database } from "@/server/models/database.types";
 import { getEmailDraftForMeeting } from "@/server/models/email-draft-model";
@@ -17,6 +18,7 @@ import {
   getMeetingById,
   markMeetingFailed,
   markMeetingQuotaBlocked,
+  retryMeetingStatus,
   updateMeetingStatus,
   type MeetingRow,
 } from "@/server/models/meeting-model";
@@ -196,6 +198,60 @@ export async function advance(
       chunksTotal: meeting.chunk_count,
       error: "Part of the audio did not come through.",
     };
+  }
+
+  return currentStatus(supabase, meetingId);
+}
+
+export class RetryNotAllowedError extends Error {
+  constructor(
+    message: string,
+    public readonly reason: "not_failed" | "audio_purged",
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * Explicit user-triggered retry of a "failed" meeting -- distinct from the
+ * sweep cron's stale-meeting rescue (getMeetingsNeedingAdvance only looks at
+ * "transcribing"/"analyzing"/"quota_blocked", never "failed": a failed
+ * meeting is a terminal status that only a deliberate retry should move out
+ * of). Only actually resumes the *next* advance() call, same "exactly one
+ * unit of work" contract as everything else here.
+ *
+ * "TRANSCRIBE_FAILED" is the one failure mode that needs real chunk-level
+ * repair first: claimNextChunkToTranscribe and hasChunksAwaitingTranscription
+ * both only look at "uploaded"/"processing" chunks, so a chunk stuck at
+ * "failed" is otherwise invisible to the transcribing loop -- flipping
+ * meeting.status back to "transcribing" without resetting it would silently
+ * skip straight to "analyzing" with a chunk missing. Every other failure
+ * mode (ANALYZE_TOO_LONG, ANALYZE_INVALID_OUTPUT, EMAIL_INVALID_OUTPUT) can
+ * just resume at "analyzing" -- advanceAnalysis already re-derives which
+ * sub-step to redo from real summary/email-draft rows.
+ */
+export async function retryMeeting(
+  supabase: SupabaseClient<Database>,
+  meetingId: string,
+): Promise<PipelineStatus> {
+  const meeting = await getMeetingById(supabase, meetingId);
+  if (!meeting) throw new HttpError(404, "Meeting not found.");
+
+  if (meeting.status !== "failed") {
+    throw new RetryNotAllowedError("Only a failed meeting can be retried.", "not_failed");
+  }
+
+  if (meeting.error_code === "TRANSCRIBE_FAILED") {
+    if (meeting.audio_purged_at) {
+      throw new RetryNotAllowedError(
+        "This meeting's audio has been deleted, so transcription can't be retried.",
+        "audio_purged",
+      );
+    }
+    await resetFailedChunksToUploaded(supabase, meetingId);
+    await retryMeetingStatus(supabase, meetingId, "transcribing");
+  } else {
+    await retryMeetingStatus(supabase, meetingId, "analyzing");
   }
 
   return currentStatus(supabase, meetingId);

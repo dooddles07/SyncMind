@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { StatusStepper } from "@/components/app/status-stepper";
+import { Button } from "@/components/ui/button";
 import { statusCopy, type MeetingStatus } from "@/lib/types";
 
 const POLL_MS = 2000;
@@ -32,7 +34,29 @@ export function PipelinePoller({
   const router = useRouter();
   const [status, setStatus] = useState<MeetingStatus>(initialStatus);
   const [detail, setDetail] = useState(initialDetail);
+  const [retrying, setRetrying] = useState(false);
   const advancing = useRef(false);
+
+  async function retry() {
+    setRetrying(true);
+    try {
+      const res = await fetch("/api/pipeline/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingId }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(result.error?.message ?? "Could not retry this meeting.");
+        return;
+      }
+      const nextStatus = result.status as MeetingStatus;
+      setStatus(nextStatus);
+      setDetail(result.stageDetail ?? statusCopy[nextStatus]?.hint);
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   useEffect(() => {
     if (!ACTIVE_STATUSES.includes(status)) return;
@@ -70,5 +94,14 @@ export function PipelinePoller({
     return () => clearInterval(interval);
   }, [status, meetingId, router]);
 
-  return <StatusStepper status={status} detail={detail} />;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <StatusStepper status={status} detail={detail} />
+      {status === "failed" && (
+        <Button variant="outline" size="sm" onClick={retry} disabled={retrying}>
+          {retrying ? "Retrying…" : "Try again"}
+        </Button>
+      )}
+    </div>
+  );
 }

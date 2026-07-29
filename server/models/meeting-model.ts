@@ -66,6 +66,20 @@ export async function markMeetingFailed(
   if (error) throw error;
 }
 
+/** Retry entry point: resumes a "failed" meeting to a real working status and
+ *  clears the stale error so it doesn't linger once work resumes. */
+export async function retryMeetingStatus(
+  supabase: SupabaseClient<Database>,
+  id: string,
+  status: MeetingStatus,
+): Promise<void> {
+  const { error } = await supabase
+    .from("meetings")
+    .update({ status, error_code: null, error_message: null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function markMeetingQuotaBlocked(
   supabase: SupabaseClient<Database>,
   id: string,

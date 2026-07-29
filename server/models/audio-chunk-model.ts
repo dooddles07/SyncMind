@@ -83,6 +83,22 @@ export async function releaseChunk(supabase: SupabaseClient<Database>, chunkId: 
   if (error) throw error;
 }
 
+/** Retry entry point: puts every "failed" chunk for a meeting back to
+ *  "uploaded" so claimNextChunkToTranscribe can pick it up again. Attempts /
+ *  last_error are left as-is -- a real history of what already went wrong,
+ *  not reset just because the user asked to try again. */
+export async function resetFailedChunksToUploaded(
+  supabase: SupabaseClient<Database>,
+  meetingId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("audio_chunks")
+    .update({ status: "uploaded" })
+    .eq("meeting_id", meetingId)
+    .eq("status", "failed");
+  if (error) throw error;
+}
+
 export async function hasChunksAwaitingTranscription(
   supabase: SupabaseClient<Database>,
   meetingId: string,

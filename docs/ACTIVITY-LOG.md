@@ -4,6 +4,50 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — Real `POST /api/pipeline/retry` (GAP-ANALYSIS 1.4, last P1 item)
+
+**Done:** closed the one remaining P1 gap. The old note claiming `advance()`
+was "already safely re-callable" on a failed meeting was wrong once actually
+checked — `advance()` has no branch for `status === "failed"` at all, and a
+chunk stuck at `chunk_status = "failed"` is invisible to both
+`claimNextChunkToTranscribe` and `hasChunksAwaitingTranscription` (they only
+look at `"uploaded"`/`"processing"`). A naive status flip back to
+`"transcribing"` would have silently skipped the broken chunk straight to
+`"analyzing"` — a real bug that would have shipped if the old assumption
+went unquestioned.
+
+- `server/models/audio-chunk-model.ts`: `resetFailedChunksToUploaded` — puts
+  `"failed"` chunks back to `"uploaded"`, leaves `attempts`/`last_error`
+  alone (real history, not reset just because the user asked to retry).
+- `server/models/meeting-model.ts`: `retryMeetingStatus` — status change +
+  clears `error_code`/`error_message` in one write, so a stale error doesn't
+  linger once work resumes.
+- `server/controllers/pipeline-controller.ts`: `retryMeeting` — only allows
+  retry from `status === "failed"` (409 otherwise, `RetryNotAllowedError`).
+  `TRANSCRIBE_FAILED` resets the chunk(s) then resumes `"transcribing"`;
+  every other failure code resumes `"analyzing"` directly, since
+  `advanceAnalysis` already re-derives the right sub-step from real
+  `summaries`/`email_drafts` rows. Also guards a purged-audio meeting (409,
+  clear message — nothing left to re-transcribe).
+- `app/api/pipeline/retry/route.ts` — same auth/thin-delegator shape as
+  `/api/pipeline/advance`.
+- `components/app/pipeline-poller.tsx` — real "Try again" button, shown only
+  when `status === "failed"`, calls the new endpoint and resumes polling on
+  success via the existing status-driven effect.
+- Verified against the **live Supabase project**, not assumed: inserted a
+  disposable meeting + chunk in `"failed"`/`chunk_status: "failed"`, called
+  `retryMeeting` for real, confirmed the actual before/after DB rows (chunk
+  `failed → uploaded`, meeting `failed → transcribing`, error fields
+  cleared), confirmed a second retry attempt is correctly rejected once no
+  longer `"failed"`, then deleted the disposable rows. The real
+  "Introduction Video" meeting used for every other verification this
+  session was untouched.
+- `typecheck`/`lint`/`test` (61/61)/`build` all green.
+- `docs/GAP-ANALYSIS.md` 1.4 now fully resolved — that closes out the last
+  open P1 item.
+
+---
+
 ## 2026-07-29 — Chunker offset math, real unit tests (GAP-ANALYSIS 2.9 remainder)
 
 **Done:** `lib/audio/chunker.ts`'s chunk-boundary loop (start offsets, the
