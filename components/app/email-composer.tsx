@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Mail } from "lucide-react";
+import { Copy, Mail, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,11 +28,12 @@ function parseRecipients(value: string): string[] {
     .filter(Boolean);
 }
 
-export function EmailComposer({ draft }: { draft: EmailDraft }) {
+export function EmailComposer({ draft, meetingId }: { draft: EmailDraft; meetingId: string }) {
   const [tone, setTone] = useState(draft.tone);
   const [subject, setSubject] = useState(draft.subject);
   const [body, setBody] = useState(draft.body);
   const [to, setTo] = useState(draft.recipients.join(", "));
+  const [regenerating, setRegenerating] = useState(false);
 
   const compose: Compose = { to: parseRecipients(to), subject, body };
   const tooLong = isTooLongForCompose(compose);
@@ -40,6 +41,28 @@ export function EmailComposer({ draft }: { draft: EmailDraft }) {
   async function copy() {
     await navigator.clipboard.writeText(asPlainText(compose));
     toast.success("Copied. Paste it into any email you like.");
+  }
+
+  async function regenerate() {
+    setRegenerating(true);
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}/email/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tone }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        toast.error(payload?.error?.message ?? "Could not regenerate the email.");
+        return;
+      }
+      const { draft: fresh } = await res.json();
+      setSubject(fresh.subject);
+      setBody(fresh.body_md);
+      toast.success("Regenerated in this tone.");
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   return (
@@ -50,9 +73,15 @@ export function EmailComposer({ draft }: { draft: EmailDraft }) {
       </p>
 
       <div>
-        <p id="tone-label" className="mb-2 text-sm font-medium">
-          How should it sound?
-        </p>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p id="tone-label" className="text-sm font-medium">
+            How should it sound?
+          </p>
+          <Button variant="outline" size="sm" onClick={regenerate} disabled={regenerating}>
+            <RefreshCw className={cn("size-4", regenerating && "animate-spin")} aria-hidden />
+            {regenerating ? "Regenerating…" : "Regenerate in this tone"}
+          </Button>
+        </div>
         <div role="radiogroup" aria-labelledby="tone-label" className="flex flex-wrap gap-2">
           {tones.map((t) => (
             <button

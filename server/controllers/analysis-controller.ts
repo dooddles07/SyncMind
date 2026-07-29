@@ -15,6 +15,7 @@ import {
   getSegmentsForMeeting,
   type TranscriptSegmentRow,
 } from "@/server/models/transcript-model";
+import { QuotaBlockedError } from "@/server/utils/pipeline-errors";
 import { runStructuredAndValidate } from "@/server/utils/structured-output";
 import { isNearDuplicate } from "@/server/utils/text-similarity";
 
@@ -24,11 +25,6 @@ const CHARS_PER_TOKEN = 4;
 const ESTIMATED_OUTPUT_TOKENS = 2500;
 
 export class AnalysisTooLongError extends Error {}
-export class QuotaBlockedError extends Error {
-  constructor(public readonly resumeAt: string) {
-    super(`Analysis quota blocked until ${resumeAt}`);
-  }
-}
 
 const SYSTEM_PROMPT = `You are an expert meeting analyst. You produce accurate, structured minutes from
 meeting transcripts. You are precise and conservative: you record only what was

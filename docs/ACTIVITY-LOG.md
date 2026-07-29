@@ -4,6 +4,64 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (M3 slice 2) — real follow-up email draft, meetings reach "ready"
+
+**Done:** the second automatic step docs/ARCHITECTURE.md's state machine specifies
+(`analyzing --> ready: minutes + actions + email persisted`) — a meeting with real
+minutes/actions now goes on to get a real drafted follow-up email, and actually
+reaches `"ready"` for the first time. Verified live against "Introduction Video".
+
+- `server/config/email-schema.ts`, `server/models/profile-model.ts` (new --
+  nothing read the `profiles` table before this), `server/models/email-draft-model.ts`
+  (`upsertEmailDraft` added) — supporting pieces per `AI-PIPELINE.md` §4.
+- `server/controllers/email-controller.ts` — `draftEmail(supabase, meeting, tone)`:
+  reads the real `summaries`/`action_items`/`profiles` rows, builds the exact §4
+  prompt (including an explicit key-by-key SCHEMA block appended to the system
+  prompt — same fix as slice 1's real finding, applied proactively here since
+  Groq's `json_object` mode still isn't schema-aware), quota-checks and persists
+  the same way `analysis-controller.ts` does. Shared by both the automatic pipeline
+  step and the on-demand regenerate endpoint below.
+- `server/controllers/pipeline-controller.ts` — `advanceAnalysis` now covers two
+  ordered sub-steps under `"analyzing"`: no `summaries` row → run the analysis
+  (unchanged from slice 1); `summaries` exists but no `email_drafts` row → draft
+  the email with the user's `profiles.default_tone`, then flip `meetings.status` to
+  `"ready"`. Both existing is the idempotent safety net.
+- **Removed the `analysisReady` workaround from slice 1.** It existed only because
+  nothing could ever flip a meeting out of `"analyzing"` yet — now that `"ready"` is
+  a real terminal state this slice produces, `PipelineStatus` dropped the field and
+  `components/app/pipeline-poller.tsx` went back to watching `status` directly
+  (poll while `"transcribing"` or `"analyzing"`, stop and refresh otherwise). Net
+  simplification, not new functionality.
+- `app/api/meetings/[id]/email/regenerate/route.ts` (new, `POST { tone }`) — the
+  endpoint `ARCHITECTURE.md` §5 names explicitly, callable any time after analysis
+  regardless of whether the meeting has reached `"ready"` yet. `components/app/
+  email-composer.tsx` gained a real "Regenerate in this tone" action wired to it
+  (the tone selector previously only changed local state — picking a tone did
+  nothing server-side until now).
+- **Deliberately deferred, flagged not hidden:** persisting manual edits to the
+  composer's subject/body fields and the `edited_by_user` discard-warning §4
+  describes for regeneration. No component in the app (`TodoTable` included)
+  persists inline edits server-side yet — this is a pre-existing, consistent gap,
+  not something invented or skipped just for email.
+- **Live verification:** ran `advance()` again against "Introduction Video" (already
+  real minutes/actions from slice 1) — a real `email_drafts` row appeared with a
+  real generated subject/body referencing actual meeting content, and
+  `meetings.status` reached `"ready"` for the first time, confirmed via direct
+  Supabase query and in the browser (status stepper shows all four steps checked).
+  `usage_daily.llm_calls`/`llm_tokens` increased again (2 calls / 1733 tokens total
+  for the day) — real Groq usage. Re-ran `advance()` on the now-`"ready"` meeting:
+  `llm_calls`/`llm_tokens` unchanged, confirming idempotency. Separately verified
+  tone regeneration (professional → friendly) produces a real, schema-valid,
+  differently-toned draft and persists correctly.
+  **Caveat:** the regenerate endpoint's full path (real HTTP `POST` through a
+  signed-in browser session, not a script) was verified for the underlying prompt/
+  persistence logic directly rather than end-to-end through the running UI, since
+  the assistant's browser tooling has no authenticated session for this app and
+  asking for OAuth credentials isn't appropriate — the user was handed the button
+  to click directly as the actual UI-path check.
+- Verification: `npm run typecheck`, `lint`, `test` (45 tests, unchanged --
+  no new pure-function logic needed unit tests this slice), `build` all green.
+
 ## 2026-07-29 (M3 slice 1) — real analysis: minutes + action items (single-pass)
 
 **Done:** a meeting stuck at `"analyzing"` since the transcription pass now actually

@@ -101,7 +101,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
           <TodoTable initial={todos} meetingTitle={meeting.title} />
         </TabsContent>
         <TabsContent value="email">
-          <EmailComposer draft={draft} />
+          <EmailComposer draft={draft} meetingId={meeting.id} />
         </TabsContent>
         <TabsContent value="ask">
           <AskPanel history={history} />
