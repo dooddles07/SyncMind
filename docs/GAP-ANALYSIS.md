@@ -97,14 +97,24 @@ Fine for a portfolio, which is the stated framing. Flagging only so it stays a c
 
 Ordered as a build sequence; each item is a real dependency of the next.
 
+**Backend folder structure locked, 2026-07-28** (before real P1 code starts piling up
+on top of it): controller/model/middleware/config/utils layers under `server/`, with
+`app/api/**/route.ts` as thin delegators only. See `docs/ARCHITECTURE.md` §4 for the
+full convention and its routing note (Next.js requires `route.ts` files as the actual
+HTTP entry points — non-negotiable). Proven with one real worked example:
+`/api/health` migrated to `server/controllers/health-controller.ts` +
+`server/config/env.ts`, tested, behavior-preserving. Every P1 item below that
+mentions a `lib/supabase`, `lib/ai`, etc. path is superseded by this — the real files
+land under `server/`, organized by layer, not by domain.
+
 | # | Gap | Why it blocks |
 | --- | --- | --- |
-| 1.1 | No Supabase project, no `supabase/migrations/**` | Nothing can persist. `DATA-MODEL.md` has the schema; none of it is applied. |
-| 1.2 | No `lib/supabase/{client,server,admin}.ts`, no generated `types.ts` | Every page still imports `lib/mock/data`. |
+| 1.1 | No Supabase project, no `supabase/migrations/**` | Nothing can persist. `DATA-MODEL.md` has the schema; none of it is applied. **Blocked on you**: create a free Supabase project (supabase.com, pick a region, save the DB password) — external signup, same shape as Groq/Sentry. See `docs/ACTIVITY-LOG.md` for the exact next steps. |
+| 1.2 | No `server/config/supabase.ts` (client factories), no `server/models/`, no generated types | Every page still imports `lib/mock/data`. |
 | 1.3 | No auth: no Google sign-in, no `middleware.ts`, no `/auth/callback` | `/dashboard`, `/settings`, `/tasks`, `/meetings/[id]` are all publicly reachable and always will be until middleware exists. |
-| 1.4 | No `app/api/**` at all | `POST /api/meetings`, `POST /api/pipeline/advance`, `GET /api/meetings/:id/status`, `/api/pipeline/retry`, `/api/health` — none exist. |
-| 1.5 | No `lib/quota.ts` | Referenced by `CLAUDE.md` and `ARCHITECTURE.md`. Without it the first heavy day hits a raw upstream 429 instead of the designed `quota_blocked` state. |
-| 1.6 | No AI layer: no Groq client, no `lib/ai/structured.ts`, no Zod schemas, no prompt files | Zod is not even a dependency yet. |
+| 1.4 | `app/api/**` has one route (`/api/health`, now the worked MVC example) — everything else missing | `POST /api/meetings`, `POST /api/pipeline/advance`, `GET /api/meetings/:id/status`, `/api/pipeline/retry` — none exist. |
+| 1.5 | No `lib/quota.ts` | Referenced by `CLAUDE.md` and `ARCHITECTURE.md`; deliberately not moved into `server/` (see `ARCHITECTURE.md` §4) since `CLAUDE.md` already names its path — revisit when it's actually built. Without it the first heavy day hits a raw upstream 429 instead of the designed `quota_blocked` state. |
+| 1.6 | No AI layer: no Groq client, no Zod schemas, no prompt files, no `server/controllers/` for analysis/transcription | Zod is not even a dependency yet. |
 | 1.7 | No `ffmpeg.wasm` worker, no chunker | `@ffmpeg/ffmpeg` is not in `package.json`. This is the single largest unbuilt client-side piece. |
 | 1.8 | [components/app/dropzone.tsx:29](../components/app/dropzone.tsx#L29) is a fake uploader | `start()` runs a `setInterval` for six ticks, never reads the file bytes, then hardcodes `router.push("/meetings/q3-planning")`. Any file, any size, any format "succeeds". |
 | 1.9 | Mock getters ignore their id argument | `getTranscript(_meetingId)`, `getSpeakers`, `getNotes`, `getEmailDraft`, `getAskHistory` all return the Q3 fixture. Open "Northwind kickoff call" and you read the Q3 planning transcript. Visible today, not just after the swap. |
@@ -168,5 +178,5 @@ Nothing in the recommended stack requires a payment method at any step.
 2. ~~P2.6 connect Vercel~~ **Already done**, discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/).
 3. ~~P2.1, P2.2, P2.6, P2.7, P2.8~~ **All done.** Every "fix what's wrong" P2 item is closed — what's left is genuinely new build work.
 4. ~~P2.4, P2.5~~ **Done** — error/not-found UI and OG image/robots/sitemap shipped. The demo now looks finished when shared, and it already has a real URL to share.
-5. ~~P2.9~~ **Partially done** (Vitest + 28 tests; Playwright + chunker tests wait on P1). ~~P2.10~~ **Wired**, pending you creating a Sentry project. Every standalone P2 item is now closed or waiting on P1. P1.1 → P1.13 in order — the real build, M1 through M3, is what's left.
+5. ~~P2.9~~ **Partially done** (Vitest + 28 tests; Playwright + chunker tests wait on P1). ~~P2.10~~ **Wired**, pending you creating a Sentry project. Every standalone P2 item is now closed or waiting on P1. Backend folder structure locked (`server/`, MVC-style layers) with `/api/health` as the worked example. P1.1 → P1.13 in order — the real build, M1 through M3 — is what's left, blocked first on you creating the Supabase project.
 6. P3.

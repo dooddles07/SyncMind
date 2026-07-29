@@ -4,6 +4,59 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — Backend folder structure locked: server/ with MVC-style layers
+
+**Done:** the user wants a controller/model/middleware/config/utils convention for
+the P1 backend, adapted from Express-style MVC. Flagged and resolved two real
+constraints before building anything on top of the wrong shape: Next.js App Router
+routing is filesystem-based and non-negotiable (`app/api/**/route.ts` must exist as
+the actual HTTP entry points — can't move into `server/`), and a literal separate
+Express process was explicitly ruled out (breaks the zero-cost, no-always-on-worker
+architecture every prior decision this session assumed). Landed on: `route.ts` files
+as thin one-line delegators into `server/controllers/`, `server/routes/` as a
+reference map rather than the real dispatcher, guard functions in
+`server/middleware/` called explicitly (no Express chaining exists in App Router).
+
+- `docs/ARCHITECTURE.md` §4 rewritten: full `server/` tree
+  (controllers/models/middleware/config/utils/routes), a routing-note paragraph
+  explaining the two constraints above, and `lib/` redefined as strictly
+  shared/client-safe code (types, utils, motion, the deliberately-client-side
+  `lib/export/*`, `lib/mock/data.ts` until retired). `lib/quota.ts` deliberately
+  *not* moved — already named as a path in `CLAUDE.md`, revisit when it's actually
+  built rather than rename out from under existing project instructions.
+- **One real worked example, not a stub**: migrated `/api/health` (the only backend
+  logic that existed) into the new pattern. `server/config/env.ts` (scoped to what
+  the health check actually needs, not a speculative catch-all), plus
+  `server/controllers/health-controller.ts` (framework-agnostic — no `next/server`
+  import, proves controllers are testable without mocking Next), and
+  `app/api/health/route.ts` reduced to a two-line delegator.
+  `server/controllers/health-controller.test.ts` added, following the Vitest pattern
+  from the P2.9 pass.
+- Deliberately did **not** scaffold `server/models/` or `server/middleware/` with
+  empty placeholder content — per this repo's own `CLAUDE.md` guidance against
+  half-finished implementations and premature abstraction, those get real content
+  when there's something real to model or guard (P1.2+, once Supabase exists).
+
+**Verified behavior-preserving, not just a file shuffle:** curled `/api/health`
+before and after — identical `{status, timestamp, commit}` shape, `commit` still
+correctly falls back to `"dev"` locally. `npm run typecheck`, `lint`, `test` (30
+tests now, up from 28), and `build` all green, same 13 routes, same bundle sizes.
+
+**What actually unblocks P1.1 next — concrete, not abstract:**
+1. Sign up free at supabase.com (no card required).
+2. New project — pick the region closest to you, **save the database password**
+   somewhere safe, it's only shown once.
+3. `npm i -g supabase`, then `supabase login`.
+4. `supabase link --project-ref <ref>` (ref is in the project's Settings → General).
+5. Once linked, migrations from `docs/DATA-MODEL.md`'s schema can be written and
+   applied with `supabase db push` — that's the actual start of P1.1's build work.
+
+Steps 1-2 only you can do (account creation, password). Steps 3-5 onward I can do
+once you've completed 1-2 and shared the project ref / connection details (never the
+DB password itself — that only goes in `.env.local`, never pasted into chat).
+
+---
+
 ## 2026-07-28 — Sentry error monitoring wired
 
 **Done:** P2.10 from `docs/GAP-ANALYSIS.md`. Last standalone P2 item — everything past

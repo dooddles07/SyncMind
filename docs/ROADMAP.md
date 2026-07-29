@@ -12,7 +12,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 | 0.3 | shadcn/ui init; add Button, Input, Card, Dialog, Tabs, Badge, Toast, Skeleton, Progress, DropdownMenu, Select, Textarea, AlertDialog, Tooltip, Avatar, Separator, Sheet, Command |
 | 0.4 | **Done.** Design tokens (Room Tone, `app/globals.css` — the design-system doc was folded into code, see `CLAUDE.md`); fonts via `next/font`; `next-themes` wired |
 | 0.5 | Create Supabase project; run migrations `0001`-`0008` from DATA-MODEL |
-| 0.6 | Generate `lib/supabase/types.ts`; build browser/server/admin clients |
+| 0.6 | Generate Supabase types; build client factories in `server/config/supabase.ts` (see `ARCHITECTURE.md` §4 — backend folder structure locked 2026-07-28) |
 | 0.7 | `.env.example` complete; `.gitignore`; local `.env.local` verified |
 | 0.8 | Vercel project connected, preview deploys on PR |
 | 0.9 | `ci.yml` — **done**: typecheck + lint + build on every push and PR, all green. Unit step still waits on Vitest (not configured). `keepalive.yml` — **done**: every 3 days, pings `/api/health` and self-commits a heartbeat so GitHub never auto-disables it from 60 days of repo inactivity, independent of deploy state. See `docs/GAP-ANALYSIS.md` P0.2. |
@@ -70,7 +70,7 @@ Six milestones to a launched MVP. Estimates assume one developer working focused
 
 | # | Task |
 | --- | --- |
-| 3.1 | `lib/ai/structured.ts` — call, parse, validate, repair, fall back |
+| 3.1 | `server/controllers/` — structured call, parse, validate, repair, fall back |
 | 3.2 | Zod schemas from AI-PIPELINE §3 with post-validation clamps |
 | 3.3 | Analysis prompt files; single-pass path |
 | 3.4 | Map-reduce path above ~5k tokens (not 60k — see `AI-PIPELINE.md` §3, the real binding constraint is Groq's 12k-tokens/minute rate limit, not the 128k context window) |
@@ -171,7 +171,7 @@ consent screen, zero verification, zero expiry.
 
 | # | Risk | Likelihood | Impact | Mitigation |
 | --- | --- | --- | --- | --- |
-| R1 | Groq free-tier limits tighten or the free tier ends | Medium | High | Provider abstraction in `lib/ai/`; Gemini fallback already implemented; browser-side Whisper via transformers.js documented as the escape hatch |
+| R1 | Groq free-tier limits tighten or the free tier ends | Medium | High | Provider abstraction in `server/controllers/`; Gemini fallback already implemented; browser-side Whisper via transformers.js documented as the escape hatch |
 | R2 | `ffmpeg.wasm` fails on older or mobile browsers | Medium | Medium | Explicit fallback in M1.11; direct upload allowed under 20 MB; error copy tells the user how to compress |
 | R3 | 60s Vercel limit exceeded by a slow chunk | Low | High | 10-minute chunks transcribe in 5-20s; if a chunk times out it retries with a 5-minute split |
 | R4 | Supabase pauses after inactivity | Medium | Medium | Keep-alive cron every 3 days from M0 |

@@ -127,6 +127,23 @@ If `ffmpeg.wasm` fails to load (old browser, blocked WASM), fall back: upload th
 
 ## 4. Application structure
 
+Backend-only code (anything that touches a secret or the database) lives under
+`server/`, organized by MVC-style layer rather than by domain. `lib/` stays reserved
+for code that is either shared with or runs entirely in the browser — `lib/types.ts`,
+`lib/utils.ts`, `lib/motion.ts`, `lib/export/ics.ts` + `gmail.ts` (deliberately
+client-side, no secret, see §3.4's neighbor decision), and `lib/mock/data.ts` until
+the backend swap retires it.
+
+**Routing note.** Next.js App Router routing is filesystem-based and non-negotiable —
+`app/api/**/route.ts` files are the only valid HTTP entry points, so `server/routes/`
+below is a route→controller *reference map*, not the real dispatcher. Every
+`route.ts` is a thin delegator: parse the request, call a controller, return the
+response — no business logic and no direct Supabase calls in `app/api/**` itself.
+There's also no Express-style middleware chain in App Router, so `server/middleware/`
+holds guard functions (`requireAuth`, `requireCronSecret`, `validateBody`) that
+controllers call explicitly at the top of each method, rather than something
+auto-applied per route.
+
 ```
 syncmind/
 ├── app/
@@ -147,7 +164,9 @@ syncmind/
 │   │       └── ask/page.tsx
 │   ├── share/[token]/page.tsx        Public read-only view
 │   ├── auth/callback/route.ts        Supabase OAuth callback
-│   └── api/                          see §5
+│   └── api/                          Thin delegators only, see §5 and the routing
+│                                      note above -- e.g. api/health/route.ts calls
+│                                      server/controllers/health-controller.ts
 ├── components/
 │   ├── ui/                           shadcn primitives
 │   ├── upload/                       Dropzone, ChunkProgress
@@ -155,20 +174,42 @@ syncmind/
 │   │                                 ActionTable, EmailComposer, AskPanel,
 │   │                                 AudioPlayer, StatusStepper
 │   └── actions/                      KanbanBoard, ActionCard
+├── server/
+│   ├── controllers/                  One file per resource. Framework-agnostic --
+│   │                                 no next/server import -- so each is testable
+│   │                                 without mocking Next. health-controller.ts is
+│   │                                 the worked example this convention was proven
+│   │                                 against.
+│   ├── models/                       Supabase table types + the query functions for
+│   │                                 that table. The only layer allowed to import a
+│   │                                 Supabase client.
+│   ├── middleware/                   Guard functions, called explicitly (see the
+│   │                                 routing note above).
+│   ├── config/                       Typed env access (env.ts), client factories.
+│   ├── utils/                        Shared helpers with no domain knowledge.
+│   └── routes/                       Route -> controller reference map. Docs, not
+│                                     the dispatcher.
 ├── lib/
-│   ├── supabase/                     browser.ts, server.ts, admin.ts, types.ts
-│   ├── ai/                           groq.ts, gemini.ts, prompts/, schemas.ts,
-│   │                                 chunk-transcribe.ts, analyze.ts, ask.ts
-│   ├── audio/                        ffmpeg-worker.ts, chunker.ts, stitch.ts
-│   ├── pipeline/                     advance.ts, state.ts, locks.ts
-│   ├── export/                       markdown.ts, ics.ts, srt.ts, gmail.ts
-│   └── quota.ts                      free-tier accounting
+│   ├── types.ts, utils.ts, motion.ts, use-*.ts   Shared / client-safe
+│   ├── export/                       ics.ts, gmail.ts -- client-side, no secret
+│   ├── mock/                         data.ts -- retired once server/models/ lands
+│   └── quota.ts                      free-tier accounting. Not moved into server/ --
+│                                     already named as `lib/quota.ts` in CLAUDE.md;
+│                                     revisit its home when it's actually built (P1)
 ├── supabase/migrations/              numbered SQL files
 ├── docs/
 └── .github/workflows/                keepalive.yml, sweep.yml, ci.yml
 ```
 
-**Rules.** Server Components read data directly through the server Supabase client; no `/api` round-trip for reads the page owns. Route handlers exist for mutations, external API calls, and anything needing a secret. Secrets (`GROQ_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, Google client secret) are referenced only inside `app/api/**` and `lib/**` modules imported by them — never in a `"use client"` file. `lib/export/ics.ts` and `lib/export/gmail.ts` hold no secret and run entirely client-side.
+**Rules.** Server Components read data directly through a server Supabase client
+(`server/config/`); no `/api` round-trip for reads the page owns. Route handlers exist
+for mutations, external API calls, and anything needing a secret — and stay thin,
+delegating to `server/controllers/`. Secrets (`GROQ_API_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`, Google client secret) are referenced only inside
+`server/**` modules — never in a `"use client"` file, and never in `lib/`, which is
+reserved for shared/client-safe code. `lib/export/ics.ts` and `lib/export/gmail.ts`
+hold no secret and run entirely client-side, which is exactly why they stay in `lib/`
+rather than `server/`.
 
 ## 5. API contracts
 
