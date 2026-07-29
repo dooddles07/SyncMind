@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckSquare, LogOut, Menu, Mic, Settings, Upload, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,6 +9,7 @@ import { Wordmark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/browser";
+import { exit, micro, press, spring } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -59,54 +61,68 @@ export function Sidebar() {
     <>
       {/* Mobile bar */}
       <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur-md lg:hidden">
-        <button
+        <motion.button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open menu"
-          className="inline-flex size-9 items-center justify-center rounded-md border border-border"
+          whileTap={press}
+          className="inline-flex size-9 items-center justify-center rounded-md border border-border transition-colors duration-150 hover:bg-muted"
         >
           <Menu className="size-4" aria-hidden />
-        </button>
+        </motion.button>
         <Link href="/dashboard">
           <Wordmark />
         </Link>
         <ThemeToggle className="ml-auto" />
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close menu"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-foreground/40"
-          />
-          <div className="absolute inset-y-0 left-0 flex w-72 flex-col gap-6 border-r border-border bg-card p-4">
-            <div className="flex items-center justify-between">
-              <Wordmark />
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close menu"
-                className="inline-flex size-9 items-center justify-center rounded-md border border-border"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            </div>
-            <Button asChild>
-              <Link href="/upload">
-                <Upload className="size-4" aria-hidden />
-                New meeting
-              </Link>
-            </Button>
-            {list}
-            <Button variant="ghost" onClick={signOut} className="mt-auto justify-start">
-              <LogOut className="size-4" aria-hidden />
-              Sign out
-            </Button>
+      <AnimatePresence>
+        {open && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <motion.button
+              type="button"
+              aria-label="Close menu"
+              onClick={() => setOpen(false)}
+              className="absolute inset-0 bg-foreground/40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={micro}
+            />
+            <motion.div
+              className="absolute inset-y-0 left-0 flex w-72 flex-col gap-6 border-r border-border bg-card p-4"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%", transition: exit }}
+              transition={spring}
+            >
+              <div className="flex items-center justify-between">
+                <Wordmark />
+                <motion.button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close menu"
+                  whileTap={press}
+                  className="inline-flex size-9 items-center justify-center rounded-md border border-border transition-colors duration-150 hover:bg-muted"
+                >
+                  <X className="size-4" aria-hidden />
+                </motion.button>
+              </div>
+              <Button asChild>
+                <Link href="/upload">
+                  <Upload className="size-4" aria-hidden />
+                  New meeting
+                </Link>
+              </Button>
+              {list}
+              <Button variant="ghost" onClick={signOut} className="mt-auto justify-start">
+                <LogOut className="size-4" aria-hidden />
+                Sign out
+              </Button>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Desktop rail */}
       <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col gap-6 border-r border-border p-4 lg:flex">
