@@ -125,7 +125,7 @@ Answer the question using only the excerpts above.`;
     if (parsed.success) result = parsed.data;
   }
 
-  await recordUsage(supabase, { askTokens: totalTokens });
+  await recordUsage(supabase, { askTokens: totalTokens }, meeting.user_id);
 
   // A "not in transcript" answer citing a timestamp would be self-contradictory
   // in the UI (a clickable "Heard at 00:00" next to "this wasn't said") -- the

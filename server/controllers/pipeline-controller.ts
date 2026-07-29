@@ -79,13 +79,17 @@ function failedStatus(meeting: MeetingRow, message: string): PipelineStatus {
 
 /**
  * Does exactly one unit of work and returns, per docs/ARCHITECTURE.md section 3.3 --
- * transcribe one pending chunk, flip to "analyzing" once none are left, or (for an
+ * transcribe one pending chunk, flip to "analyzing" once none are left, (for an
  * "analyzing" meeting) run whichever of the analysis / email-draft sub-steps hasn't
- * happened yet. Idempotent: calling this on a meeting that's neither "transcribing"
- * nor "analyzing" is a safe no-op that just reports the current state; losing the
- * chunk-claim race to a concurrent call (docs/ARCHITECTURE.md section 7: "advisory
- * lock contention -> return current state, not an error") and re-advancing an
- * already-"ready" meeting both behave the same way.
+ * happened yet, or (for a "quota_blocked" meeting whose resume_at has passed) flip
+ * back to whichever real status picks up where it left off -- docs/ARCHITECTURE.md's
+ * state diagram documents `quota_blocked --> transcribing: quota window resets`, and
+ * the same resume logic covers a block that happened during analysis or the email
+ * step too. Idempotent: calling this on a meeting that's none of the above is a safe
+ * no-op that just reports the current state; losing the chunk-claim race to a
+ * concurrent call (docs/ARCHITECTURE.md section 7: "advisory lock contention ->
+ * return current state, not an error") and re-advancing an already-"ready" meeting
+ * both behave the same way.
  */
 export async function advance(
   supabase: SupabaseClient<Database>,
@@ -96,6 +100,10 @@ export async function advance(
 
   if (meeting.status === "analyzing") {
     return advanceAnalysis(supabase, meeting);
+  }
+
+  if (meeting.status === "quota_blocked") {
+    return advanceQuotaBlocked(supabase, meeting);
   }
 
   if (meeting.status !== "transcribing") {
@@ -155,7 +163,7 @@ export async function advance(
       segments: stitched,
     });
     await markChunkDone(supabase, chunk.id);
-    await recordUsage(supabase, { audioSeconds: chunk.duration_sec });
+    await recordUsage(supabase, { audioSeconds: chunk.duration_sec }, meeting.user_id);
   } catch (err) {
     if (err instanceof GroqRateLimitError) {
       await releaseChunk(supabase, chunk.id);
@@ -191,6 +199,31 @@ export async function advance(
   }
 
   return currentStatus(supabase, meetingId);
+}
+
+/**
+ * One unit of work for a "quota_blocked" meeting: if resume_at is still in the
+ * future, a no-op that just reports current state (same shape as every other
+ * idempotent branch). Once it's passed, flips status to "transcribing" if chunks
+ * are still awaiting transcription, or "analyzing" otherwise -- advanceAnalysis
+ * already re-derives analysis-vs-email-step from real data, so "analyzing" is the
+ * correct resume target whether the block happened during analysis or the email
+ * step. The actual resumed work happens on the *next* advance() call, consistent
+ * with "exactly one unit of work per call".
+ */
+async function advanceQuotaBlocked(
+  supabase: SupabaseClient<Database>,
+  meeting: MeetingRow,
+): Promise<PipelineStatus> {
+  if (!meeting.resume_at || new Date(meeting.resume_at) > new Date()) {
+    return currentStatus(supabase, meeting.id);
+  }
+
+  const nextStatus = (await hasChunksAwaitingTranscription(supabase, meeting.id))
+    ? "transcribing"
+    : "analyzing";
+  await updateMeetingStatus(supabase, meeting.id, nextStatus);
+  return currentStatus(supabase, meeting.id);
 }
 
 /**

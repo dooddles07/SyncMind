@@ -1,0 +1,24 @@
+name: Sweep
+
+# docs/ARCHITECTURE.md section 6: "A meeting stuck in a non-terminal state for
+# over 10 minutes is picked up by a daily GitHub Actions sweep that advances it."
+# Covers the case where nobody has the meeting's page open in a browser tab --
+# the client poller (components/app/pipeline-poller.tsx) already handles the
+# tab-open case on its own.
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sweep endpoint
+        run: |
+          if [ -z "${{ vars.APP_URL }}" ]; then
+            echo "APP_URL repo variable not set yet -- skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "${{ vars.APP_URL }}/api/cron/sweep" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

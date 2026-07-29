@@ -4,6 +4,60 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (M2.11 / M5) — real sweep cron: stalled-meeting recovery + audio purge
+
+**Done:** `POST /api/cron/sweep` and `sweep.yml` (`docs/ARCHITECTURE.md` §5/§6),
+the last named-but-unbuilt piece of the pipeline infrastructure. Researching what
+"advances stalled meetings" actually requires surfaced two more real gaps
+underneath it, both fixed as prerequisites, not scope creep:
+
+- **`meetings.updated_at` never changed after insert.** `meetings_active_idx
+  (status, updated_at)` already existed for exactly this staleness query, but no
+  trigger populated the column on `UPDATE`. Added `set_updated_at()` +
+  `before update on meetings` trigger. Verified with a real no-op update:
+  `updated_at` actually moved.
+- **`quota_blocked` meetings never resumed, ever.** `ARCHITECTURE.md`'s own state
+  diagram documents `quota_blocked --> transcribing: quota window resets`, but
+  `advance()` had no branch for it and `pipeline-poller.tsx` stopped polling
+  entirely on that status (the doc says it should keep polling at 60s). A
+  quota-blocked meeting was permanently stuck, tab open or not. Fixed:
+  `advance()` now flips a quota-blocked meeting (once `resume_at` has passed)
+  to `"transcribing"` or `"analyzing"` depending on real remaining work, and the
+  poller polls at 60s while blocked. Verified live: forced a real meeting into
+  `quota_blocked` with a past `resume_at`, called `advance()` twice --
+  `quota_blocked → analyzing → ready`, exactly as designed.
+- **A cron-invoked `advance()` would have crashed on any real Groq call.**
+  `recordUsage`'s `increment_usage_daily` RPC derived the user from `auth.uid()`
+  only, which is null for a `CRON_SECRET`-authenticated request with no user
+  session -- the same `not null` violation hit repeatedly this session testing
+  with the admin client directly. Extended the RPC to `p_user_id uuid default
+  null` with `coalesce(auth.uid(), p_user_id)`; `recordUsage` gained an optional
+  `userId` param, threaded through its four real call sites
+  (pipeline/analysis/email/ask controllers). Browser-driven calls are unaffected
+  -- `auth.uid()` still wins when a real session exists.
+- `server/controllers/sweep-controller.ts` — `advanceStalledMeetings` (10-minute
+  staleness or a passed `resume_at`, loops `advance()` up to 10x per meeting so
+  one sweep run can make real progress, not just one flip), `purgeExpiredAudio`
+  (per-user `profiles.retention_days`, skips `pinned`, real `storage.remove()`
+  then `audio_purged_at`).
+- `app/api/cron/sweep/route.ts` — Bearer-guarded by `CRON_SECRET`, generated a
+  real value (`crypto.randomBytes(32).toString("base64url")`) and handed it to
+  the user for Vercel + GitHub Actions secrets, same manual-step pattern as
+  every other secret this project (Groq key, Supabase keys).
+- **Live verification, careful about it:** the purge test needed a meeting past
+  its retention window with a real Storage object to delete -- rather than purge
+  "Introduction Video" (the one real meeting used across every feature's live
+  test this session), built two disposable throwaway meetings with real
+  uploaded objects, backdated `created_at` past the test user's real
+  `retention_days` (7). Ran the actual `/api/cron/sweep` endpoint: the
+  non-pinned one got `audio_purged_at` set and its Storage object genuinely
+  deleted (confirmed via `storage.list()` returning empty); the pinned one was
+  correctly skipped, object still present. Cleaned up both afterward. Also
+  verified the auth guard directly: wrong secret and no header both 401, correct
+  secret 200 with a real summary.
+- Verification: `npm run typecheck`, `lint`, `test` (45 tests, unchanged),
+  `build` all green.
+
 ## 2026-07-29 (M5.4) — real share link, first dead button wired
 
 **Done:** "Share a read-only link" (`docs/GAP-ANALYSIS.md` 1.11's first listed dead

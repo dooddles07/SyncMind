@@ -586,6 +586,7 @@ export type Database = {
           p_day: string
           p_llm_calls?: number
           p_llm_tokens?: number
+          p_user_id?: string
         }
         Returns: undefined
       }

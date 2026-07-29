@@ -6,15 +6,19 @@ import { StatusStepper } from "@/components/app/status-stepper";
 import { statusCopy, type MeetingStatus } from "@/lib/types";
 
 const POLL_MS = 2000;
+const QUOTA_BLOCKED_POLL_MS = 60000;
+const ACTIVE_STATUSES: MeetingStatus[] = ["transcribing", "analyzing", "quota_blocked"];
 
 /**
  * The browser drives the pipeline (docs/ARCHITECTURE.md section 3.1 -- no
  * always-on worker on the free tier). While the meeting is "transcribing" or
  * "analyzing", this calls /api/pipeline/advance every ~2s; each call does one real
  * unit of work (transcribe a chunk, run the analysis, or draft the follow-up email)
- * server-side and returns the new state. Stops once status leaves both of those --
- * "ready" and "failed"/"quota_blocked" are real terminal-for-now states, not a
- * stall this component needs to work around.
+ * server-side and returns the new state. While "quota_blocked", it keeps polling
+ * too -- at 60s (docs/ARCHITECTURE.md section 5's documented polling table) -- since
+ * advance() resumes a quota-blocked meeting on its own once resume_at passes; a
+ * closed tab is covered separately by the daily sweep cron. Stops and refreshes on
+ * "ready"/"failed", the real terminal states.
  */
 export function PipelinePoller({
   meetingId,
@@ -31,7 +35,8 @@ export function PipelinePoller({
   const advancing = useRef(false);
 
   useEffect(() => {
-    if (status !== "transcribing" && status !== "analyzing") return;
+    if (!ACTIVE_STATUSES.includes(status)) return;
+    const intervalMs = status === "quota_blocked" ? QUOTA_BLOCKED_POLL_MS : POLL_MS;
 
     const interval = setInterval(async () => {
       if (advancing.current) return;
@@ -52,15 +57,15 @@ export function PipelinePoller({
               ? `Transcribing chunk ${result.chunksDone} of ${result.chunksTotal}`
               : statusCopy[nextStatus]?.hint),
         );
-        if (nextStatus !== "transcribing" && nextStatus !== "analyzing") {
-          // A real status change landed server-side (ready/failed/quota_blocked)
-          // -- refresh the page's server data too, not just this component's view.
+        if (!ACTIVE_STATUSES.includes(nextStatus)) {
+          // A real terminal transition landed server-side (ready/failed) --
+          // refresh the page's server data too, not just this component's view.
           router.refresh();
         }
       } finally {
         advancing.current = false;
       }
-    }, POLL_MS);
+    }, intervalMs);
 
     return () => clearInterval(interval);
   }, [status, meetingId, router]);

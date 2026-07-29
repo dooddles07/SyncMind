@@ -96,6 +96,18 @@ export async function hasChunksAwaitingTranscription(
   return (count ?? 0) > 0;
 }
 
+/** All chunks regardless of status -- audio purge needs every real object that
+ *  might exist in Storage for this meeting, not just the successfully-transcribed
+ *  ones. */
+export async function getStoragePathsForMeeting(
+  supabase: SupabaseClient<Database>,
+  meetingId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase.from("audio_chunks").select("storage_path").eq("meeting_id", meetingId);
+  if (error) throw error;
+  return data.map((row) => row.storage_path);
+}
+
 export async function countDoneChunks(
   supabase: SupabaseClient<Database>,
   meetingId: string,

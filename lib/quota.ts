@@ -64,12 +64,15 @@ export async function checkAndReserve(
 
 /** Atomic upsert -- docs/AI-PIPELINE.md section 7's exact shape, so two concurrent
  *  calls for the same user/day both land instead of one clobbering the other. The
- *  Postgres function derives the user from auth.uid() itself (supabase/migrations/
- *  ..._quota_increment_function.sql) rather than trusting a passed-in id, so a caller
- *  can never inflate or reset someone else's quota. */
+ *  Postgres function derives the user from auth.uid() when there's a real session;
+ *  `userId` is only a fallback for the sweep cron, which authenticates via
+ *  CRON_SECRET and has no session -- coalesce(auth.uid(), p_user_id) in the RPC
+ *  means a browser-driven call still can't inflate or reset someone else's quota
+ *  by passing a different id, since auth.uid() always wins when it's set. */
 export async function recordUsage(
   supabase: SupabaseClient<Database>,
   usage: { audioSeconds?: number; llmTokens?: number; askTokens?: number },
+  userId?: string,
 ): Promise<void> {
   const { error } = await supabase.rpc("increment_usage_daily", {
     p_day: todayUtc(),
@@ -79,6 +82,7 @@ export async function recordUsage(
     p_llm_tokens: usage.llmTokens ?? 0,
     p_ask_calls: usage.askTokens !== undefined ? 1 : 0,
     p_ask_tokens: usage.askTokens ?? 0,
+    p_user_id: userId,
   });
   if (error) throw error;
 }

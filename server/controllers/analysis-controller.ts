@@ -142,7 +142,7 @@ Produce the JSON object described in the schema.`;
   const { result, totalTokens } = await runStructuredAndValidate(AnalysisSchema, SYSTEM_PROMPT, userPrompt, {
     temperature: 0.2,
   });
-  await recordUsage(supabase, { llmTokens: totalTokens });
+  await recordUsage(supabase, { llmTokens: totalTokens }, meeting.user_id);
 
   const durationSec = meeting.duration_sec;
   const topics = result.topics.map((t) => ({ ...t, atSec: clamp(t.atSec, durationSec) }));

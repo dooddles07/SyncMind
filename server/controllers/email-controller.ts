@@ -102,7 +102,7 @@ Write the follow-up email.`;
   const { result, totalTokens } = await runStructuredAndValidate(EmailSchema, systemPrompt, userPrompt, {
     temperature: 0.4,
   });
-  await recordUsage(supabase, { llmTokens: totalTokens });
+  await recordUsage(supabase, { llmTokens: totalTokens }, meeting.user_id);
 
   await upsertEmailDraft(supabase, {
     meeting_id: meeting.id,

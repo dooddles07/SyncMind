@@ -16,7 +16,7 @@ Verified by reading: 68 tracked files, `npm run build` (passes), `npm run typech
 | Auth | Live — Google OAuth, `middleware.ts`, session, route protection. |
 | AI | Transcription real (Groq Whisper). Analysis + email real (Llama 3.3 70B, single-pass only — map-reduce and the Gemini fallback deliberately deferred). Ask real (Llama 3.1 8B, Postgres full-text retrieval, no vector DB). |
 | Integrations | Resolved — no OAuth needed. `lib/export/gmail.ts` + `lib/export/ics.ts`. |
-| CI / cron | `ci.yml` and `keepalive.yml` done. `sweep.yml` still missing (needs P1). |
+| CI / cron | `ci.yml`, `keepalive.yml`, and `sweep.yml` all done and real. |
 | Tests | Do not exist. No runner installed. |
 | Deploy | Repo pushed to `github.com/dooddles07/SyncMind`. **Vercel connected and live** at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/) — confirmed via `/api/health`. |
 
@@ -131,7 +131,7 @@ land under `server/`, organized by layer, not by domain.
 | --- | --- | --- |
 | 2.1 | ~~`npm run lint` is broken~~ **Resolved** | `eslint@9` + `eslint-config-next@15.5.22` (matches installed Next exactly) installed, flat config at `eslint.config.mjs` using `FlatCompat` to bridge `next/core-web-vitals` + `next/typescript`. `npm run lint` now runs `eslint .` and passes clean. |
 | 2.2 | ~~No CI~~ **Resolved** | `.github/workflows/ci.yml`: typecheck + lint + test + build on every push/PR, all four green. |
-| 2.3 | `keepalive.yml` **done** / `sweep.yml` still missing | See P0.2/P0.3. `sweep.yml` needs the pipeline state machine (P1/M2), not built yet. |
+| 2.3 | ~~`keepalive.yml` done / `sweep.yml` missing~~ **Both resolved** | `sweep.yml` + `POST /api/cron/sweep`, `CRON_SECRET`-guarded, real `advanceStalledMeetings`/`purgeExpiredAudio`. Needed two real prerequisite fixes found while building it: `meetings.updated_at` had no trigger (staleness was unmeasurable), and `quota_blocked` meetings never resumed at all (no branch in `advance()`, poller stopped polling on it) — both fixed, verified live. |
 | 2.4 | ~~No error/not-found UI~~ **Resolved** | `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`, `app/loading.tsx` all added, all reuse `EmptyState` for visual consistency (`global-error.tsx` excepted — it replaces `<html>`/`<body>` itself, so it's plain inline styles by necessity). Verified in browser via Playwright. |
 | 2.5 | ~~No OG image, no `robots.ts`, no `sitemap.ts`~~ **Resolved** | `app/opengraph-image.tsx` (`next/og`, brand mark + tagline, verified rendering in browser), `app/robots.ts`, `app/sitemap.ts` all added. Along the way, fixed a real bug the build surfaced: `metadataBase` wasn't set in `app/layout.tsx`, so the OG image's URL would have resolved to `localhost` in production — the feature would have silently done nothing on the live site. No `manifest.ts` — that's PWA/installability, out of scope for this pair. |
 | 2.6 | ~~No Vercel project connected~~ **Already done** | Discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/) since before this scan started. |
