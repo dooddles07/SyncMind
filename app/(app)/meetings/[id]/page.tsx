@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { AskPanel } from "@/components/app/ask-panel";
 import { EmailComposer } from "@/components/app/email-composer";
+import { ExportMenu } from "@/components/app/export-menu";
 import { NotesPanel } from "@/components/app/notes-panel";
 import { PipelinePoller } from "@/components/app/pipeline-poller";
+import { PrintMinutes } from "@/components/app/print-minutes";
 import { ShareButton } from "@/components/app/share-button";
 import { TodoTable } from "@/components/app/todo-table";
 import { TranscriptPanel } from "@/components/app/transcript";
@@ -49,7 +51,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
+      <div className="print:hidden">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -66,46 +68,55 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
               <span className="tabular">{formatDuration(meeting.duration)}</span>
             </p>
           </div>
-          <ShareButton meetingId={meeting.id} initialLink={shareLink} />
+          <div className="flex gap-2">
+            <ExportMenu meetingId={meeting.id} />
+            <ShareButton meetingId={meeting.id} initialLink={shareLink} />
+          </div>
         </div>
       </div>
 
-      <PipelinePoller
-        meetingId={meeting.id}
-        initialStatus={meeting.status}
-        initialDetail={meeting.note ?? statusCopy[meeting.status].hint}
-      />
+      <div className="print:hidden">
+        <PipelinePoller
+          meetingId={meeting.id}
+          initialStatus={meeting.status}
+          initialDetail={meeting.note ?? statusCopy[meeting.status].hint}
+        />
+      </div>
 
-      <Tabs defaultValue="notes">
-        <TabsList>
-          <TabsTrigger value="notes">Notes</TabsTrigger>
-          <TabsTrigger value="transcript">Transcript</TabsTrigger>
-          <TabsTrigger value="todos">To-dos</TabsTrigger>
-          <TabsTrigger value="email">Follow-up</TabsTrigger>
-          <TabsTrigger value="ask">Ask</TabsTrigger>
-        </TabsList>
+      <div className="print:hidden">
+        <Tabs defaultValue="notes">
+          <TabsList>
+            <TabsTrigger value="notes">Notes</TabsTrigger>
+            <TabsTrigger value="transcript">Transcript</TabsTrigger>
+            <TabsTrigger value="todos">To-dos</TabsTrigger>
+            <TabsTrigger value="email">Follow-up</TabsTrigger>
+            <TabsTrigger value="ask">Ask</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="notes">
-          <NotesPanel notes={notes} />
-        </TabsContent>
-        <TabsContent value="transcript">
-          <TranscriptPanel
-            segments={segments}
-            speakers={speakers}
-            duration={meeting.duration}
-            audioAvailable={meeting.audioAvailable}
-          />
-        </TabsContent>
-        <TabsContent value="todos">
-          <TodoTable initial={todos} meetingTitle={meeting.title} />
-        </TabsContent>
-        <TabsContent value="email">
-          <EmailComposer draft={draft} meetingId={meeting.id} />
-        </TabsContent>
-        <TabsContent value="ask">
-          <AskPanel history={history} meetingId={meeting.id} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="notes">
+            <NotesPanel notes={notes} />
+          </TabsContent>
+          <TabsContent value="transcript">
+            <TranscriptPanel
+              segments={segments}
+              speakers={speakers}
+              duration={meeting.duration}
+              audioAvailable={meeting.audioAvailable}
+            />
+          </TabsContent>
+          <TabsContent value="todos">
+            <TodoTable initial={todos} meetingTitle={meeting.title} />
+          </TabsContent>
+          <TabsContent value="email">
+            <EmailComposer draft={draft} meetingId={meeting.id} />
+          </TabsContent>
+          <TabsContent value="ask">
+            <AskPanel history={history} meetingId={meeting.id} />
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <PrintMinutes meeting={meeting} notes={notes} todos={todos} />
     </div>
   );
 }

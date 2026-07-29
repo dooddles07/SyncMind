@@ -72,6 +72,7 @@ export async function getTranscript(meetingId: string): Promise<Segment[]> {
     id: String(row.id),
     speakerId: row.speaker ?? "unknown",
     at: row.start_sec,
+    end: row.end_sec,
     text: row.text,
   }));
 }

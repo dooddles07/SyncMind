@@ -146,7 +146,7 @@ land under `server/`, organized by layer, not by domain.
 
 - Accessibility pass: contrast on all three semantic tones, focus order, full keyboard path, screen-reader labels (ROADMAP 5.7).
 - Responsive verification at 375 / 768 / 1024 / 1440 (ROADMAP 5.8).
-- Export paths: Markdown, print stylesheet for PDF, `.srt` / `.txt` transcript, `.ics` (the `.ics` piece is promoted to P0.1).
+- ~~Export paths: Markdown, print stylesheet for PDF, `.srt` / `.txt` transcript, `.ics`.~~ **All done** — `GET /api/meetings/:id/export?format=md|srt|txt`, `components/app/print-minutes.tsx` + `print:` variant for PDF, `.ics` shipped earlier (M4). Verified live: real downloads, real `.srt` cue timestamps from `end_sec`, clean print preview.
 - ~~Real share-link creation with revoke.~~ **Done** — see 1.10/1.11.
 - ~~Hard delete verified against the Supabase dashboard.~~ **Done** (account-level; per-meeting `DELETE /api/meetings/:id` is still separate, unbuilt) — see 1.11.
 - Eval fixture set and `npm run eval`.

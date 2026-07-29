@@ -24,6 +24,9 @@ export interface Segment {
   speakerId: string;
   /** seconds from the start of the recording */
   at: number;
+  /** seconds from the start of the recording -- optional since most UI only
+   *  needs `at` as a seek-anchor; .srt export needs a real end per cue. */
+  end?: number;
   text: string;
 }
 

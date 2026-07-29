@@ -4,6 +4,52 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (M5.3 / F12) — real export: Markdown, PDF, transcript .txt/.srt
+
+**Done:** `docs/PRODUCT-REQUIREMENTS.md` F12 in full except `.ics` (already
+shipped, M4) — `GET /api/meetings/:id/export?format=md|srt|txt`
+(`docs/ARCHITECTURE.md` §5) and a client-side print stylesheet for PDF. No
+export button existed anywhere before this.
+
+- **Real gap found while researching:** `Segment` (`lib/types.ts`) only
+  carried `at` (start), not an end timestamp, even though
+  `transcript_segments.end_sec` is a real column — dropped during
+  `getTranscript`'s mapping since the UI only ever needed a seek-anchor. A
+  real `.srt` file needs an actual per-cue `start --> end` range, not a
+  fabricated one, so `Segment` gained an optional `end` and `getTranscript`
+  now populates it from the real column.
+- `lib/export/transcript.ts` (new) — `buildSrt` (real `end` when present,
+  falls back to the next segment's start, or a fixed pad after the last
+  segment, only when genuinely missing) and `buildTxt`, both pure and unit
+  tested (`transcript.test.ts`) the same way `ics.ts` already is.
+- `lib/export/markdown.ts` (new) — `buildMarkdown`, unit tested
+  (`markdown.test.ts`). Reuses `NotesPanel`'s exact empty-state copy ("No
+  decisions were made in this meeting.", etc.) so the exported file reads like
+  the product, not a raw dump.
+- `app/api/meetings/[id]/export/route.ts` (`GET ?format=md|srt|txt`) — normal
+  session-scoped/RLS-protected route (not the public-share-page admin-client
+  pattern; this is always the owner exporting their own data), returns a real
+  file download with `Content-Disposition` and a real slugified filename
+  (reused `slugify` from `ics.ts`).
+- PDF: a dedicated `components/app/print-minutes.tsx` block (`hidden
+  print:block`, plain static markup, not `NotesPanel`'s interactive citation
+  buttons) always rendered alongside the interactive Tabs UI, which gets
+  `print:hidden`; `app/(app)/layout.tsx`'s `<Sidebar />` also wrapped
+  `print:hidden`. Tailwind v4's `print:` variant is built in, no custom
+  `@media print` CSS needed.
+- `components/app/export-menu.tsx` (new) — same inline-expanding-panel pattern
+  as `ShareButton`/`EmailComposer` (still no dropdown/modal primitive in this
+  app), placed next to `ShareButton` in the meeting page header.
+- **Live verification, real account:** downloaded `introduction-video.md`
+  through the actual UI (617 B, real slugified filename, real content).
+  Separately verified all three formats' content directly against real data
+  (bypassing the browser) — the `.srt` cues use real `end_sec` values
+  (`00:00:09,160`, not a rough guess), `.txt` includes real speaker prefixes.
+  Checked the browser's print preview: clean single page, real minutes
+  content only, no sidebar/tabs/nav chrome.
+- Verification: `npm run typecheck`, `lint`, `test` (56 tests, up from 45 --
+  11 new for `buildSrt`/`buildTxt`/`buildMarkdown`), `build` all green.
+
 ## 2026-07-29 (M5 follow-on) — real usage display + retention persistence
 
 **Done:** two real gaps on Settings, found by reading the actual components
