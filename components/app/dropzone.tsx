@@ -7,38 +7,112 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { chunkAudio, ChunkerError, type AudioChunk } from "@/lib/audio/chunker";
+import { createClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils";
 
 const ACCEPTED = ".mp3,.m4a,.wav,.webm,.ogg,.mp4,.mov";
-const TOTAL_PARTS = 6;
+const PARALLEL_UPLOADS = 2;
+
+async function uploadChunksInParallel(
+  chunks: AudioChunk[],
+  slots: { index: number; path: string; token: string }[],
+  onChunkDone: () => void,
+) {
+  const supabase = createClient();
+  const queue = [...chunks];
+
+  async function worker() {
+    let chunk: AudioChunk | undefined;
+    while ((chunk = queue.shift())) {
+      const slot = slots.find((s) => s.index === chunk!.index);
+      if (!slot) continue;
+      const { error } = await supabase.storage
+        .from("recordings")
+        .uploadToSignedUrl(slot.path, slot.token, chunk.blob);
+      if (error) throw new Error(`Chunk ${chunk.index} failed to upload: ${error.message}`);
+      onChunkDone();
+    }
+  }
+
+  await Promise.all(Array.from({ length: PARALLEL_UPLOADS }, worker));
+}
 
 export function Dropzone() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
-  const [file, setFile] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
-  const [part, setPart] = useState(0);
-  const [working, setWorking] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState<"idle" | "processing" | "uploading">("idle");
 
-  function accept(name: string) {
-    setFile(name);
-    setTitle(name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "));
+  function accept(picked: File) {
+    setFile(picked);
+    setTitle(picked.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "));
   }
 
-  function start() {
-    setWorking(true);
-    let n = 0;
-    const tick = setInterval(() => {
-      n += 1;
-      setPart(n);
-      if (n >= TOTAL_PARTS) {
-        clearInterval(tick);
-        toast.success("Uploaded. We will take it from here.");
-        router.push("/meetings/q3-planning");
-      }
-    }, 550);
+  async function start() {
+    if (!file) return;
+    setStage("processing");
+    setProgress(0);
+
+    let chunkResult;
+    try {
+      chunkResult = await chunkAudio(file, (ratio) => setProgress(ratio * 0.5));
+    } catch (err) {
+      setStage("idle");
+      toast.error(err instanceof ChunkerError ? err.message : "Could not process this recording.");
+      return;
+    }
+
+    let created;
+    try {
+      const res = await fetch("/api/meetings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          durationSec: chunkResult.durationSec,
+          chunks: chunkResult.chunks.map((c) => ({
+            index: c.index,
+            startSec: c.startSec,
+            durationSec: c.durationSec,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error?.message ?? "Could not start this meeting.");
+      created = (await res.json()) as { meetingId: string; chunks: { index: number; path: string; token: string }[] };
+    } catch (err) {
+      setStage("idle");
+      toast.error(err instanceof Error ? err.message : "Could not start this meeting.");
+      return;
+    }
+
+    setStage("uploading");
+    const total = chunkResult.chunks.length;
+    let done = 0;
+    try {
+      await uploadChunksInParallel(chunkResult.chunks, created.chunks, () => {
+        done += 1;
+        setProgress(0.5 + 0.5 * (done / total));
+      });
+      await fetch(`/api/meetings/${created.meetingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "transcribing" }),
+      });
+    } catch (err) {
+      setStage("idle");
+      toast.error(err instanceof Error ? err.message : "Upload didn't finish. Try again.");
+      return;
+    }
+
+    toast.success("Uploaded. We will take it from here.");
+    router.push(`/meetings/${created.meetingId}`);
   }
+
+  const working = stage !== "idle";
 
   return (
     <div className="flex flex-col gap-6">
@@ -52,7 +126,7 @@ export function Dropzone() {
           e.preventDefault();
           setOver(false);
           const dropped = e.dataTransfer.files[0];
-          if (dropped) accept(dropped.name);
+          if (dropped) accept(dropped);
         }}
         className={cn(
           "rounded-lg border-2 border-dashed p-8 text-center transition-colors duration-150",
@@ -79,7 +153,7 @@ export function Dropzone() {
           className="sr-only"
           onChange={(e) => {
             const picked = e.target.files?.[0];
-            if (picked) accept(picked.name);
+            if (picked) accept(picked);
           }}
         />
       </div>
@@ -88,31 +162,27 @@ export function Dropzone() {
         <div className="flex flex-col gap-5 rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-3">
             <FileAudio className="size-4 shrink-0 text-said-text" aria-hidden />
-            <p className="min-w-0 truncate text-sm font-medium">{file}</p>
+            <p className="min-w-0 truncate text-sm font-medium">{file.name}</p>
           </div>
 
           <Field label="What should we call this meeting?">
             {(props) => (
-              <Input {...props} value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Input {...props} value={title} onChange={(e) => setTitle(e.target.value)} disabled={working} />
             )}
-          </Field>
-
-          <Field label="When did it happen?">
-            {(props) => <Input {...props} type="date" defaultValue="2026-07-28" />}
           </Field>
 
           {working ? (
             <div>
               <Progress
                 tone="said"
-                value={part}
-                max={TOTAL_PARTS}
-                label={`Uploading part ${part} of ${TOTAL_PARTS}`}
+                value={Math.round(progress * 100)}
+                max={100}
+                label={stage === "processing" ? "Preparing the recording" : "Uploading"}
               />
               <p className="mt-2 text-sm text-muted-foreground">
-                Sending part <span className="tabular">{part}</span> of{" "}
-                <span className="tabular">{TOTAL_PARTS}</span>. You can leave this page,
-                it keeps going.
+                {stage === "processing"
+                  ? "Splitting the recording into pieces in your browser."
+                  : "Sending it to SyncMind. You can leave this page, it keeps going."}
               </p>
             </div>
           ) : (

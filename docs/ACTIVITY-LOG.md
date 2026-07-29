@@ -4,6 +4,90 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (later still) — Real upload pipeline: ffmpeg chunker, POST /api/meetings, full getter swap
+
+**Done:** the actual prerequisite for everything downstream. Before this, no real
+meeting could exist — `dropzone.tsx` was a fake `setInterval` that never read a file.
+Swapping `lib/mock/data.ts` to real queries before this existed would have just shown
+empty states everywhere.
+
+- `lib/audio/chunker.ts` — `@ffmpeg/ffmpeg` + `@ffmpeg/util` installed
+  (single-threaded core only, per the threading decision locked in `ARCHITECTURE.md`
+  §3.4 before any chunker code existed). Duration probed via a native `<audio>`
+  element rather than parsing ffmpeg's stderr log — simpler, and doesn't need the
+  ~31 MB WASM module loaded just to answer "how long is this file". Transcodes once
+  to 16 kHz mono Opus, then cheaply stream-copies ~10-minute chunks with a 3-second
+  trailing overlap off that single transcode rather than re-encoding per chunk.
+  Explicit fallback to direct upload under 20 MB if the WASM module fails to load —
+  no silent failure, matches the documented behavior exactly.
+- **Real decision, not in the original plan text:** initially planned to self-host the
+  ffmpeg core files in `public/`. Checked the actual file size first —
+  `ffmpeg-core.wasm` is ~31 MB, far too large to commit into the repo (git bloat,
+  slower clones). Switched to the CDN-fetch pattern (`unpkg`) that ffmpeg.wasm's own
+  docs recommend for exactly this reason, and removed the now-unused local
+  `@ffmpeg/core` package.
+- `server/models/{meeting,transcript,summary,action-item,email-draft,ask-query}-model.ts`
+  — one file per table, per the locked `server/` convention. `action-item-model.ts`
+  joins the meeting title via Supabase's embedded-resource select (`*, meetings(title)`)
+  since the UI's `Todo` type needs it displayed inline.
+- `server/controllers/meeting-controller.ts` — `createMeeting` (validates, inserts the
+  meeting directly as `"uploading"` rather than the documented `"draft"` — the UI's
+  `MeetingStatus` type never rendered a draft state to begin with, and the two are
+  functionally simultaneous in this flow, so skipping the round-trip is a deliberate,
+  documented simplification, not a miss), `finalizeUpload` (marks every chunk
+  uploaded and flips the meeting to `"transcribing"` in one call — correct because
+  it's only ever called after every signed-URL `PUT` already succeeded, so
+  "uploaded" is genuinely true for all chunks at once, not a partial/incremental
+  status this pass tracks).
+- **Real correction mid-build:** the plan assumed a raw `fetch PUT` to the signed
+  upload URL. Supabase's signed-upload flow actually requires the SDK's
+  `uploadToSignedUrl(path, token, file)` method with a separate `token` value, not
+  just the URL string. Caught before writing the dropzone code, not after — the
+  controller's response shape was adjusted from `{ uploadUrl }` to `{ path, token }`
+  before `app/api/meetings/route.ts` was even written.
+- `app/api/meetings/route.ts` (`POST`), `app/api/meetings/[id]/route.ts` (`PATCH`) —
+  thin delegators. Both check `auth.getUser()` themselves and return a real
+  `{ error: { code, message } }` 401 — `middleware.ts` only protects page routes, not
+  `app/api/**`, a gap worth remembering for every future route handler.
+- `components/app/dropzone.tsx` rewritten — chunks the real file, calls the real API,
+  uploads chunks 2-at-a-time via a small worker-pool loop, finalizes, redirects to
+  the real `meetingId`.
+- `lib/mock/data.ts` — every getter now a real query except `getUsage` (needs
+  `lib/quota.ts`'s limit logic, not built yet, P1.5). Mapped several real schema/UI
+  mismatches discovered while writing this, not assumed away: DB's `action_status`
+  enum uses `in_progress`, the UI's `TodoStatus` uses `doing` (mapped on read);
+  `summaries.topics` JSONB is richer (`{title, points[], atSec}`) than the UI's flat
+  `NoteItem` (`{text, at}`) — flattened to the title for now, full reconciliation is
+  M3 work alongside the real summarization UI; no schema column tracks "this to-do's
+  owner is still an unconfirmed AI guess", approximated as `ai_generated &&
+  !edited_by_user` until a dedicated column exists. The old fixture arrays are
+  deleted — `ARCHITECTURE.md` §4 already documented this as `lib/mock/`'s expected
+  retirement point.
+
+**Consequence surfaced, not hidden:** `/share/[token]` still hardcodes `q3-planning`
+(P1.10, deliberately out of scope for this pass) — that id no longer exists in the
+real DB, so the share page now renders blank instead of leaking the old fixture data.
+Safer failure mode than before, but still needs its real implementation.
+
+**Verified — what's provable without a real Google session, and what isn't:**
+`npm run typecheck`, `lint`, `test`, `build` all green, no regressions. Curl-confirmed
+the real auth boundary: `POST /api/meetings` and `PATCH /api/meetings/:id` both `401`
+with no session, matching `ARCHITECTURE.md` §5's documented error shape exactly;
+`/upload` still `307`s to `/login`. Checked the live `profiles` table directly — empty,
+confirming no sign-in has happened yet, so the actual authenticated upload path
+(chunk → create → upload → finalize → real DB rows) could not be exercised by this
+session and needs the user to actually sign in and try a real upload. Left the dev
+server running for that.
+
+**Next:** once a real upload is tested, confirm via `supabase db query` that the
+`meetings`/`audio_chunks` rows and the Storage object actually exist and belong to the
+signed-in user (RLS still holding, not a service-role bypass) — same trusted
+verification pattern as P1.1/P1.2. After that: `lib/quota.ts`, the AI layer, and
+eventually `/api/pipeline/advance` (M2) are what turn an uploaded-but-stuck meeting
+into a transcribed one.
+
+---
+
 ## 2026-07-29 (later) — P1.3 external setup completed, sign-in fully live
 
 **Done:** the two external steps flagged in the earlier entry today are complete.
