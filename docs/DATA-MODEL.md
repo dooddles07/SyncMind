@@ -336,6 +336,27 @@ Notes:
 - **The public share page does not use the anon key.** It runs server-side with the service-role client, which bypasses RLS, and is scoped by an explicit query: look up the token, verify `revoked_at is null` and `expires_at` is future, then read only that `meeting_id`. Nothing else is reachable.
 - Service role is used in exactly three places: the share page, `/api/cron/*`, and the pipeline's storage reads. Every other server path uses the request-scoped user client so RLS still applies.
 
+**RLS is not the only permission check.** Postgres also enforces table-level `GRANT`s
+before RLS ever runs — a role with no `GRANT` on a table gets "permission denied"
+regardless of what its RLS policies say. Supabase's dashboard normally handles this
+invisibly: creating a table there with "Automatically expose new tables" on
+auto-grants `anon`/`authenticated`/`service_role`. This project's project was created
+with that toggle **off** (deliberately, so nothing was queryable before RLS was in
+place — see `docs/ACTIVITY-LOG.md`, 2026-07-28), which means every migration-created
+table needs an explicit `grant` — and the original 8 migrations didn't have one,
+caught only when P1.2's client factories were verified against the live project and
+every single query came back "permission denied for table X".
+
+Fixed with a 9th migration (`grant_privileges`) granting broadly to
+`anon`/`authenticated`/`service_role` on the whole `public` schema, plus
+`alter default privileges` so it applies automatically to tables created by future
+migrations too. This is not a loosening of security — `anon` still has no session, so
+`auth.uid()` is null and every `user_id = auth.uid()` policy still evaluates false for
+it. Table-level access without a matching row is not data access. **Anyone adding a
+new table by raw migration (not the dashboard) does not need to repeat this** — the
+default-privileges statement already covers it — but should know why, in case a
+future table somehow ends up outside `public` schema or the default-privileges scope.
+
 ## 5. Storage
 
 Bucket **`recordings`**, private.

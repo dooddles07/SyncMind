@@ -4,6 +4,79 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — P1.2: Supabase client factories, and a real permission bug found + fixed
+
+**Done:** `lib/supabase/browser.ts` (publishable key, `createBrowserClient` from
+`@supabase/ssr` — safe in `"use client"` components, RLS is what actually restricts
+it, not key secrecy), `server/config/supabase-server.ts` (cookie-based
+`createServerClient`, Server Components read through this directly per
+`ARCHITECTURE.md` §4 — `getAll`/`setAll` cookie handlers, `setAll` no-ops safely when
+called from a context that can't set cookies since middleware — not built yet —
+handles the actual session refresh), `server/config/supabase-admin.ts` (service-role,
+bypasses RLS, only for the three places `DATA-MODEL.md` §4 names: share page,
+`/api/cron/*`, pipeline storage reads). Installed `@supabase/supabase-js` +
+`@supabase/ssr`.
+
+**Real bug found during verification, not assumed fixed:** built a temporary debug
+route (`app/api/_debug-supabase` — first attempt 404'd, Next treats `_`-prefixed
+folders as private/excluded from routing, renamed to `debug-supabase`) calling
+`createAdminClient()` against the live `profiles` table. Got back `{ message: '' }` —
+an error with no code, no stack, nothing else useful.
+
+Chased down several red herrings before finding the real cause, worth recording since
+they'll look identical to a first-time debugger:
+1. Suspected the pasted anon/service-role keys were truncated (the dashboard UI shows
+   them with a visual "..." ellipsis in a narrow box). Had the user re-copy with the
+   actual copy-icon buttons. Same lengths came back — this was a red herring, the new
+   `sb_publishable_`/`sb_secret_` key format is genuinely short by design, unlike the
+   old ~200-char JWT keys. The ellipsis was just CSS truncation, not real truncation.
+2. Suspected a stale dev-server process holding old env vars (Next only reads
+   `.env.local` at boot). Restarted — same error. Also a real, separate problem
+   (background dev-server processes on this machine don't always die cleanly when
+   stopped, leaving zombies on old ports — 3000, 3002, 3003 all had leftover
+   listeners at different points), but not the actual cause here.
+3. **Actual cause**, found by bypassing the JS client entirely and curling the REST
+   API directly with the service-role key: `403`, `"permission denied for table
+   profiles"`, `"hint":"Grant the required privileges to the current role with:
+   GRANT SELECT ON public.profiles TO service_role"`. RLS was correctly enabled
+   (verified in the P1.1 pass), but Postgres checks table-level `GRANT`s *before* RLS
+   ever runs, and those were never opened — because "Automatically expose new
+   tables" was deliberately left off at project creation (P1.1, so nothing became
+   queryable before RLS was in place), and that toggle is what normally auto-grants
+   `anon`/`authenticated`/`service_role` on dashboard-created tables. Migration-created
+   tables don't get that for free; needed an explicit `grant`.
+4. **Fixed with a 9th migration**, `grant_privileges` — `grant all` broadly to
+   `anon`/`authenticated`/`service_role` on the `public` schema, plus
+   `alter default privileges` so future migration-created tables inherit it
+   automatically. Not a security loosening: `anon` still has no session, RLS still
+   evaluates false for it on every row. Documented the two-layer model (GRANT +
+   RLS, not RLS alone) in `docs/DATA-MODEL.md` §4 so this doesn't get rediscovered
+   the hard way on the next table.
+5. Re-verified with the same direct-curl method first (isolates the database from
+   the JS client layer) — `200`, empty array, correct. Then re-verified through the
+   actual app code path (the debug route calling the real `createAdminClient()`) —
+   `{"ok":true,"profilesCount":0}`. Removed the debug route.
+
+**Also cleaned up:** killed the lingering zombie `node` processes across stale dev
+server instances (PowerShell `Stop-Process`) before the final clean verification run,
+so port 3000 resolved predictably again.
+
+**Verified:** `npm run typecheck`, `lint`, `test` (still 30, nothing new — no test
+coverage was owed here, these are thin client factories with no branching logic of
+their own to unit test) and `build` all green, same 13 routes, no `debug-supabase`
+leftover in the build output.
+
+**Never touched:** the database password, or the raw key values — every diagnostic
+step (length checks, prefix/suffix checks, the direct curl tests) was written to
+avoid printing secret content into the conversation, using shell variable
+indirection and substring probes instead of `cat`.
+
+**Next:** the client factories exist but nothing uses them yet — `lib/mock/data.ts`
+is still what every page reads. That swap, plus auth (`middleware.ts`, Google
+sign-in, `/auth/callback`) is the next real chunk of P1.
+
+---
+
 ## 2026-07-28 — P1.1: Supabase project created, schema applied and verified
 
 **Done:** the actual start of the real backend build. User created the Supabase
