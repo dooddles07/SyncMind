@@ -1,4 +1,4 @@
-import { ArrowLeft, Share2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -6,15 +6,16 @@ import { AskPanel } from "@/components/app/ask-panel";
 import { EmailComposer } from "@/components/app/email-composer";
 import { NotesPanel } from "@/components/app/notes-panel";
 import { PipelinePoller } from "@/components/app/pipeline-poller";
+import { ShareButton } from "@/components/app/share-button";
 import { TodoTable } from "@/components/app/todo-table";
 import { TranscriptPanel } from "@/components/app/transcript";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getAskHistory,
   getEmailDraft,
   getMeeting,
   getNotes,
+  getShareLink,
   getSpeakers,
   getTodos,
   getTranscript,
@@ -36,13 +37,14 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
   const meeting = await getMeeting(id);
   if (!meeting) notFound();
 
-  const [segments, speakers, notes, todos, draft, history] = await Promise.all([
+  const [segments, speakers, notes, todos, draft, history, shareLink] = await Promise.all([
     getTranscript(id),
     getSpeakers(id),
     getNotes(id),
     getTodos(id),
     getEmailDraft(id),
     getAskHistory(id),
+    getShareLink(id),
   ]);
 
   return (
@@ -64,10 +66,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
               <span className="tabular">{formatDuration(meeting.duration)}</span>
             </p>
           </div>
-          <Button variant="outline" size="sm">
-            <Share2 className="size-4" aria-hidden />
-            Share a read-only link
-          </Button>
+          <ShareButton meetingId={meeting.id} initialLink={shareLink} />
         </div>
       </div>
 

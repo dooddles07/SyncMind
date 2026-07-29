@@ -13,6 +13,7 @@ import { getActionItems } from "@/server/models/action-item-model";
 import { getAskQueriesForMeeting } from "@/server/models/ask-query-model";
 import { getEmailDraftForMeeting } from "@/server/models/email-draft-model";
 import { getMeetingById, getMeetingsForUser, type MeetingRow } from "@/server/models/meeting-model";
+import { getActiveShareLinkForMeeting } from "@/server/models/share-link-model";
 import { getSummaryForMeeting } from "@/server/models/summary-model";
 import { getSegmentsForMeeting, getSpeakerLabelsForMeeting } from "@/server/models/transcript-model";
 import { createClient } from "@/server/config/supabase-server";
@@ -140,6 +141,26 @@ export async function getAskHistory(meetingId: string): Promise<AskExchange[]> {
     answer: row.answer,
     citations: (row.citations as { atSec: number }[]).map((c) => c.atSec),
   }));
+}
+
+export interface ShareLink {
+  token: string;
+  url: string;
+  includeTranscript: boolean;
+  viewCount: number;
+}
+
+export async function getShareLink(meetingId: string): Promise<ShareLink | null> {
+  const supabase = await createClient();
+  const row = await getActiveShareLinkForMeeting(supabase, meetingId);
+  if (!row) return null;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return {
+    token: row.token,
+    url: `${baseUrl}/share/${row.token}`,
+    includeTranscript: row.include_transcript,
+    viewCount: row.view_count,
+  };
 }
 
 // Usage stays a fixture: real numbers need lib/quota.ts's not-yet-built limit logic

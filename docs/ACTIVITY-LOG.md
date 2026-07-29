@@ -4,6 +4,51 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (M5.4) — real share link, first dead button wired
+
+**Done:** "Share a read-only link" (`docs/GAP-ANALYSIS.md` 1.11's first listed dead
+button) is real. `app/share/[token]/page.tsx` was a hardcoded stub calling
+`getMeeting("q3-planning")` and ignoring its own `token` param entirely — it now
+looks up the real token and renders that meeting's real notes/to-dos (and
+transcript, if the creator opted in). The `share_links` table, its RLS policy, and
+the public-page security model were already fully designed
+(`docs/DATA-MODEL.md`, `docs/ARCHITECTURE.md` §5) — this was wiring real code to
+an already-decided design, same pattern as the M3 slices.
+
+- `server/models/share-link-model.ts` (new) — owner-scoped reads/writes via the
+  normal session client (RLS-protected), plus `getShareLinkByToken` which is
+  **only** ever called with the admin client, matching the documented model: the
+  public page has no caller session to scope RLS by, so it deliberately bypasses
+  RLS and does its own explicit `revoked_at`/`expires_at` check instead.
+- `server/controllers/share-controller.ts` — `createShareLink` generates the token
+  with Node's built-in `crypto.randomBytes(32).toString("base64url")`, no new
+  dependency, per the doc's exact spec ("32-byte base64url, generated app-side").
+- `app/api/meetings/[id]/share/route.ts` (`POST`), `app/api/share/[token]/route.ts`
+  (`DELETE`) — the two routes `ARCHITECTURE.md` §5 names explicitly.
+- `components/app/share-button.tsx` (new) — inline expanding panel (no modal
+  primitive exists in this app yet, and none of its sibling panels use one
+  either) with an "include transcript" checkbox, then the URL with copy/revoke
+  once created.
+- **Real bug found via live testing:** `revokeShareLink` was implemented as a
+  hard `DELETE`. It still produced correct behavior (a deleted row 404s the same
+  as a revoked one, since `getShareLinkByToken`'s `!data` check catches both) but
+  threw away the audit trail `docs/SECURITY-PRIVACY.md` §4 describes ("`revoked_at`
+  is checked on every request") — no record of when a link was live or how many
+  views it got before revocation. Fixed to an `UPDATE ... set revoked_at = now()`
+  before shipping, not after a user hit it.
+- **Live verification, unusual for this session:** the public `/share/:token`
+  page needs no auth, so for once the assistant's own Playwright tooling could
+  verify the full flow directly rather than handing it to the user. Created a
+  real link via script (admin client, no `auth.uid()` dependency issue this
+  time — plain inserts with an explicit `user_id`, unlike the LLM-quota RPCs in
+  the M3 slices), loaded it in a real browser: real notes, real transcript lines,
+  real "no to-dos" (correctly, not a fallback), `noindex, nofollow` confirmed in
+  the rendered meta tag, `view_count` incremented in the DB. Revoked it, reloaded
+  the same URL: real 404 ("This page doesn't exist"), confirmed the row still
+  exists with a real `revoked_at` timestamp rather than being gone.
+- Verification: `npm run typecheck`, `lint` (one `react/no-unescaped-entities` fix
+  in `share-button.tsx`), `test` (45 tests, unchanged), `build` all green.
+
 ## 2026-07-29 (M3 slice 3) — real "Ask this meeting", M3 fully done
 
 **Done:** the last unbuilt piece of M3 (`docs/AI-PIPELINE.md` §6) — real Q&A over a
