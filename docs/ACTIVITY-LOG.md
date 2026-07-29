@@ -4,6 +4,46 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (M5.5) — real "Delete all my data"
+
+**Done:** the last dead button in Settings. `docs/SECURITY-PRIVACY.md` §4 already
+specified the exact behavior ("deletes every meeting and the `auth.users` row,
+which cascades the profile... behind a typed confirmation") — the schema was
+already built for it, this was wiring real code to it.
+
+- `server/controllers/account-controller.ts` — `deleteAllUserData`: clears every
+  Storage object for the user first (`audio_chunks.user_id` directly, one query
+  across all their meetings, no per-meeting loop), then
+  `supabase.auth.admin.deleteUser(userId)`. That single call cascades everything
+  else automatically — every child table already references `profiles(id) on
+  delete cascade`, and `profiles.id references auth.users(id) on delete cascade`
+  (confirmed in the original migration, not assumed). Storage is the only thing
+  cascade doesn't reach, so it's handled manually first.
+- `app/api/account/route.ts` (`DELETE`) — reads the real session first, always
+  deletes the authenticated caller's own id, never a client-supplied one.
+- `components/app/delete-account-button.tsx` — typed confirmation (must type
+  `DELETE` exactly to enable the real button), matching the documented "behind a
+  typed confirmation." No modal primitive exists in this app, so this is the same
+  inline-expanding-panel pattern as `ShareButton`/`EmailComposer`.
+- **Correction to `docs/GAP-ANALYSIS.md` 1.11 found while researching:** it also
+  listed a "Disconnect Google" dead button. That button doesn't exist in the
+  codebase — there's nothing to disconnect, since no OAuth token is ever held
+  (the M4 pivot away from the Gmail/Calendar APIs). Fixed the doc line instead
+  of building a button for a feature that shouldn't exist.
+- **Live verification, deliberately not against the real account:** deleting
+  the actual signed-in account used for every live test this session would be
+  destructive and irreversible for no real benefit. Instead, created a fully
+  disposable user via `supabase.auth.admin.createUser` (no real Google OAuth
+  needed for an admin-created user), gave it a real meeting with a real uploaded
+  Storage object, ran `deleteAllUserData` directly, and confirmed via direct
+  queries afterward: the `auth.users` row, the cascaded `profiles` row, the
+  cascaded `meetings` row, and the Storage object are all genuinely gone.
+  Nothing to clean up afterward — the whole disposable account no longer
+  exists. Separately confirmed the real "Introduction Video" meeting and the
+  real account are untouched.
+- Verification: `npm run typecheck`, `lint`, `test` (45 tests, unchanged),
+  `build` all green.
+
 ## 2026-07-29 (M2.11 / M5) — real sweep cron: stalled-meeting recovery + audio purge
 
 **Done:** `POST /api/cron/sweep` and `sweep.yml` (`docs/ARCHITECTURE.md` §5/§6),

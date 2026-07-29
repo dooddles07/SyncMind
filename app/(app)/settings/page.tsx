@@ -1,8 +1,8 @@
 import { X } from "lucide-react";
 import type { Metadata } from "next";
+import { DeleteAccountButton } from "@/components/app/delete-account-button";
 import { RetentionSlider } from "@/components/app/retention-slider";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getUsage } from "@/lib/mock/data";
 import { createClient } from "@/server/config/supabase-server";
@@ -110,9 +110,7 @@ export default async function SettingsPage() {
         title="Delete everything"
         description="This removes every recording, transcript, note and to-do in your account. It cannot be undone."
       >
-        <Button variant="danger" size="sm">
-          Delete all my data
-        </Button>
+        <DeleteAccountButton />
       </Section>
     </div>
   );

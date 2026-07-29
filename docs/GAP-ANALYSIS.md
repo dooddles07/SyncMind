@@ -119,7 +119,7 @@ land under `server/`, organized by layer, not by domain.
 | 1.8 | ~~Fake uploader~~ **Resolved** | `components/app/dropzone.tsx` rewritten: reads the real file, runs it through the chunker with real progress reporting, calls `POST /api/meetings`, uploads every chunk via Supabase's `uploadToSignedUrl` (2 parallel), flips status via `PATCH`, redirects to the real `meetingId`. Verified: unauthenticated `POST`/`PATCH` both `401`. Full authenticated upload needs a real signed-in session — handed to the user to test, DB-side result to be verified after. |
 | 1.9 | ~~Mock getters ignore their id argument~~ **Resolved as a side effect** | All of `getMeetings`, `getMeeting`, `getTranscript`, `getSpeakers`, `getNotes`, `getTodos`, `getEmailDraft`, `getAskHistory` now real Supabase queries via new `server/models/*.ts` files, scoped by RLS. `getUsage` deliberately stays mock — needs `lib/quota.ts`'s limit logic (1.5), not a plain read. The old fixture arrays in `lib/mock/data.ts` are gone — `ARCHITECTURE.md` §4 already called this the expected retirement point. |
 | 1.10 | ~~`app/share/[token]/page.tsx` ignores its token~~ **Resolved** | Rewritten to use `getShareLinkByToken` with the admin client, per the documented security model: token lookup, `revoked_at`/`expires_at` checks, scoped to exactly that `meeting_id`, real notes/to-dos/optional transcript. Verified live via Playwright (the one page in this app that needs no auth, so the assistant could check it directly): real content rendered, `noindex` confirmed, `view_count` incremented, revoke correctly 404s while preserving the row (a real bug — the first implementation hard-deleted instead of setting `revoked_at` — caught and fixed before shipping). |
-| 1.11 | Dead buttons | ~~"Share a read-only link" (meeting page)~~ **Resolved**, real create/copy/revoke via `components/app/share-button.tsx`. "Disconnect Google" and "Delete all my data" (settings) still have no `onClick` — separate, unrelated features. |
+| 1.11 | ~~Dead buttons~~ **Resolved** | "Share a read-only link" (meeting page): real create/copy/revoke via `components/app/share-button.tsx`. "Delete all my data" (settings): real hard delete via `components/app/delete-account-button.tsx`, `DELETE /api/account`, `server/controllers/account-controller.ts` — typed confirmation, storage cleanup, `auth.admin.deleteUser` cascades everything else. "Disconnect Google" was also listed here but doesn't exist in the codebase — a stale claim, corrected: there's no OAuth token held to disconnect (M4's pivot away from the Gmail/Calendar APIs), so there was never a button to build. |
 | 1.12 | ~~Hardcoded fake identity~~ **Resolved** | Settings now reads the real signed-in user via `server/config/supabase-server.ts`'s `getUser()` — a natural side effect of building real auth (P1.3), not separate work. |
 | 1.13 | Client state does not persist | `TodoTable`, `EmailComposer`, `AskPanel`, `RetentionSlider`, `TodoBoard` are all local `useState`. Refresh loses everything. Needs server actions or route handlers. |
 
@@ -147,8 +147,8 @@ land under `server/`, organized by layer, not by domain.
 - Accessibility pass: contrast on all three semantic tones, focus order, full keyboard path, screen-reader labels (ROADMAP 5.7).
 - Responsive verification at 375 / 768 / 1024 / 1440 (ROADMAP 5.8).
 - Export paths: Markdown, print stylesheet for PDF, `.srt` / `.txt` transcript, `.ics` (the `.ics` piece is promoted to P0.1).
-- Real share-link creation with revoke.
-- Hard delete verified against the Supabase dashboard.
+- ~~Real share-link creation with revoke.~~ **Done** — see 1.10/1.11.
+- ~~Hard delete verified against the Supabase dashboard.~~ **Done** (account-level; per-meeting `DELETE /api/meetings/:id` is still separate, unbuilt) — see 1.11.
 - Eval fixture set and `npm run eval`.
 - Analytics: Vercel Web Analytics has a free Hobby tier; confirm the current event cap before wiring.
 
