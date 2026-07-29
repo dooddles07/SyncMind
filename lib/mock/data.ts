@@ -9,13 +9,16 @@ import type {
   Todo,
   Usage,
 } from "@/lib/types";
+import { DAILY_AUDIO_SECONDS } from "@/lib/quota";
 import { getActionItems } from "@/server/models/action-item-model";
 import { getAskQueriesForMeeting } from "@/server/models/ask-query-model";
 import { getEmailDraftForMeeting } from "@/server/models/email-draft-model";
 import { getMeetingById, getMeetingsForUser, type MeetingRow } from "@/server/models/meeting-model";
+import { getProfile } from "@/server/models/profile-model";
 import { getActiveShareLinkForMeeting } from "@/server/models/share-link-model";
 import { getSummaryForMeeting } from "@/server/models/summary-model";
 import { getSegmentsForMeeting, getSpeakerLabelsForMeeting } from "@/server/models/transcript-model";
+import { getUsageToday } from "@/server/models/usage-model";
 import { createClient } from "@/server/config/supabase-server";
 
 /*
@@ -163,10 +166,18 @@ export async function getShareLink(meetingId: string): Promise<ShareLink | null>
   };
 }
 
-// Usage stays a fixture: real numbers need lib/quota.ts's not-yet-built limit logic
-// (see docs/GAP-ANALYSIS.md P1.5), not a plain table read.
-const usage: Usage = { minutesUsed: 84, minutesLimit: 180, retentionDays: 7 };
-
 export async function getUsage(): Promise<Usage> {
-  return usage;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const minutesLimit = Math.round(DAILY_AUDIO_SECONDS / 60);
+  if (!user) return { minutesUsed: 0, minutesLimit, retentionDays: 7 };
+
+  const [profile, usageToday] = await Promise.all([getProfile(supabase, user.id), getUsageToday(supabase, user.id)]);
+  return {
+    minutesUsed: Math.round((usageToday?.audio_seconds ?? 0) / 60),
+    minutesLimit,
+    retentionDays: profile?.retention_days ?? 7,
+  };
 }

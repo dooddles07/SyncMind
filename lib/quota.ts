@@ -7,7 +7,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/server/models/database.types";
 
-const DAILY_AUDIO_SECONDS = Number(process.env.GROQ_DAILY_AUDIO_SECONDS ?? 28800);
+// Exported so callers that display the ceiling (Settings' "today's free
+// minutes") show the exact number checkAndReserve enforces, not a duplicate
+// guess at it.
+export const DAILY_AUDIO_SECONDS = Number(process.env.GROQ_DAILY_AUDIO_SECONDS ?? 28800);
 const DAILY_ASR_CALLS = Number(process.env.GROQ_DAILY_ASR_CALLS ?? 2000);
 const DAILY_LLM_CALLS = Number(process.env.GROQ_DAILY_LLM_CALLS ?? 1000);
 const DAILY_LLM_TOKENS = Number(process.env.GROQ_DAILY_LLM_TOKENS ?? 100000);

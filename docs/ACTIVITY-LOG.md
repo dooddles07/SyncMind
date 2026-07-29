@@ -4,6 +4,42 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (M5 follow-on) — real usage display + retention persistence
+
+**Done:** two real gaps on Settings, found by reading the actual components
+rather than trusting the docs' framing. `RetentionSlider` was pure local
+`useState` — dragging it never persisted anything, even though
+`profiles.retention_days` is a real column the sweep cron's `purgeExpiredAudio`
+already reads. `getUsage()` (`lib/mock/data.ts`) was still the original
+`{ minutesUsed: 84, minutesLimit: 180, retentionDays: 7 }` fixture;
+`docs/GAP-ANALYSIS.md` 1.9 had flagged it as deliberately mock pending
+`lib/quota.ts`, but `lib/quota.ts` has been real since M2 — the doc's stated
+reason no longer applied, it was just stale.
+
+- `lib/quota.ts` — exported the previously-private `DAILY_AUDIO_SECONDS` so
+  Settings shows the exact ceiling `checkAndReserve` enforces, not a second
+  guess at the same number.
+- `server/models/usage-model.ts` (new) — `getUsageToday`.
+- `server/models/profile-model.ts` — added `updateRetentionDays`.
+- `lib/mock/data.ts` — `getUsage()` now reads the real signed-in user's
+  `usage_daily` row and `profiles.retention_days`, same `Usage` shape/signature
+  so `app/(app)/settings/page.tsx` needed no changes to how it calls it.
+- `app/api/settings/retention/route.ts` (`PATCH { days }`) — validates
+  `1 <= days <= 30` (matches the DB's own `check` constraint) before writing.
+- `components/app/retention-slider.tsx` — keeps `onChange` for smooth local
+  dragging, persists on release (`onMouseUp`/`onTouchEnd`/`onKeyUp` for
+  keyboard users) rather than one request per pixel of drag.
+- **Live verification, real account (safe — reversible, non-destructive):**
+  dragged the slider to 15 days, confirmed via direct Supabase query that
+  `profiles.retention_days` actually became `15`; reloaded Settings and
+  confirmed it displayed the persisted value with a real success toast, not a
+  reset to default. "Today's free minutes" showed real numbers ("1 of 480
+  minutes used") matching the actual `usage_daily.audio_seconds` recorded
+  earlier this session for the real transcription work, not the old fixture's
+  84/180.
+- Verification: `npm run typecheck`, `lint`, `test` (45 tests, unchanged),
+  `build` all green.
+
 ## 2026-07-29 (M5.5) — real "Delete all my data"
 
 **Done:** the last dead button in Settings. `docs/SECURITY-PRIVACY.md` §4 already

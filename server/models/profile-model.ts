@@ -11,3 +11,12 @@ export async function getProfile(
   if (error) throw error;
   return data;
 }
+
+export async function updateRetentionDays(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  days: number,
+): Promise<void> {
+  const { error } = await supabase.from("profiles").update({ retention_days: days }).eq("id", userId);
+  if (error) throw error;
+}
