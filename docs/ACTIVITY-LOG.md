@@ -4,6 +4,28 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 — Chunker offset math, real unit tests (GAP-ANALYSIS 2.9 remainder)
+
+**Done:** `lib/audio/chunker.ts`'s chunk-boundary loop (start offsets, the
+10-min chunk length, the 3s trailing overlap, last-chunk clipping) was
+inline inside `chunkAudio`, which also drives the browser `<audio>` element
+and ffmpeg WASM — not unit-testable as-is. Extracted the pure arithmetic to
+`planChunks(durationSec): ChunkPlan[]`, same pattern as
+`transcript-stitch.ts`'s `shiftAndDedupe`. `chunkAudio` now calls it instead
+of duplicating the math.
+
+- 5 real tests in `lib/audio/chunker.test.ts`: single chunk under the
+  10-min length, exact-boundary case, overlap chaining across 2 and 3+
+  chunks, and the edge case where a non-last chunk's remaining duration is
+  less than the full overlap window (602s total — chunk 0 must clip to 602,
+  not pad to 603).
+- `typecheck`/`lint`/`test` (61/61)/`build` all green — confirms the
+  refactor didn't change `chunkAudio`'s real behavior.
+- `docs/GAP-ANALYSIS.md` 2.9 updated. Playwright E2E is the one remaining
+  test gap, and it's new infra, not a quick slice.
+
+---
+
 ## 2026-07-29 — Eval fixture set + `npm run eval` (GAP-ANALYSIS P3, last item)
 
 **Done:** last open P3 item. `docs/AI-PIPELINE.md` §8 already specified the

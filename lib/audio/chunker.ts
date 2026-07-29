@@ -40,6 +40,35 @@ export class ChunkerError extends Error {
   }
 }
 
+export interface ChunkPlan {
+  index: number;
+  startSec: number;
+  durationSec: number;
+}
+
+/**
+ * Pure offset math for splitting a recording into ~10-minute chunks with a
+ * 3-second trailing overlap (used later to de-duplicate the seam between
+ * chunks during transcription -- see shiftAndDedupe in transcript-stitch.ts).
+ * Every chunk but the last runs long by the overlap; the last chunk is
+ * clipped to the real remaining duration, never padded past it.
+ */
+export function planChunks(durationSec: number): ChunkPlan[] {
+  const chunkCount = Math.ceil(durationSec / CHUNK_DURATION_SEC);
+  const plan: ChunkPlan[] = [];
+
+  for (let index = 0; index < chunkCount; index++) {
+    const startSec = index * CHUNK_DURATION_SEC;
+    const isLast = index === chunkCount - 1;
+    const chunkDurationSec = isLast
+      ? durationSec - startSec
+      : Math.min(CHUNK_DURATION_SEC + CHUNK_OVERLAP_SEC, durationSec - startSec);
+    plan.push({ index, startSec, durationSec: chunkDurationSec });
+  }
+
+  return plan;
+}
+
 /** Real media duration via the browser, not ffmpeg -- simpler and doesn't need the
  *  WASM module loaded just to answer this. */
 function probeDuration(file: File): Promise<number> {
@@ -91,16 +120,10 @@ export async function chunkAudio(
   await ffmpeg.writeFile("input", await fetchFile(file));
   await ffmpeg.exec(["-i", "input", "-vn", "-ar", "16000", "-ac", "1", "-c:a", "libopus", "full.webm"]);
 
-  const chunkCount = Math.ceil(durationSec / CHUNK_DURATION_SEC);
+  const plan = planChunks(durationSec);
   const chunks: AudioChunk[] = [];
 
-  for (let index = 0; index < chunkCount; index++) {
-    const startSec = index * CHUNK_DURATION_SEC;
-    const isLast = index === chunkCount - 1;
-    const chunkDurationSec = isLast
-      ? durationSec - startSec
-      : Math.min(CHUNK_DURATION_SEC + CHUNK_OVERLAP_SEC, durationSec - startSec);
-
+  for (const { index, startSec, durationSec: chunkDurationSec } of plan) {
     const outName = `chunk_${index}.webm`;
     await ffmpeg.exec([
       "-ss",
@@ -116,7 +139,7 @@ export async function chunkAudio(
     const data = await ffmpeg.readFile(outName);
     const blob = new Blob([data as Uint8Array<ArrayBuffer>], { type: "audio/webm" });
     chunks.push({ index, startSec, durationSec: chunkDurationSec, blob });
-    onProgress?.(0.6 + 0.4 * ((index + 1) / chunkCount));
+    onProgress?.(0.6 + 0.4 * ((index + 1) / plan.length));
   }
 
   return { chunks, durationSec, mimeType: "audio/webm" };
