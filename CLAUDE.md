@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SyncMind is an AI meeting assistant (audio in → transcript, notes, to-dos, follow-up email, calendar entries), designed to run entirely on free tiers.
 
-**Current state: front-end only.** Every screen renders from fixtures in [lib/mock/data.ts](lib/mock/data.ts). There is no Supabase client, no `app/api/**`, no `supabase/migrations/`, no AI calls, no auth. `docs/` describes the *target* system, not what exists. Do not assume a doc-described module exists — check first.
+**Current state: fully built and live**, at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/). Real Supabase (Postgres + Auth + Storage), real `app/api/**` routes, real `supabase/migrations/`, real Google OAuth sign-in, real Groq-backed AI pipeline (transcription, minutes/action-item extraction, follow-up email, Q&A). `docs/GAP-ANALYSIS.md` is the actively-maintained record of what's verified working — read it before assuming a doc-described module is missing; it usually already exists.
 
 ## Commands
 
@@ -17,7 +17,11 @@ npm run typecheck  # tsc --noEmit  <- the real gate, run after any change
 npm run lint       # eslint ., flat config in eslint.config.mjs, wired into CI
 ```
 
-No test runner is installed. `docs/ARCHITECTURE.md` §10 plans Vitest (unit + integration) and Playwright (E2E); neither exists yet. If asked to add tests, that is new setup work, not a config tweak.
+```bash
+npm test           # vitest run — unit tests
+npm run test:e2e   # playwright test — full upload-to-share E2E, needs E2E_TEST_SECRET
+npm run eval       # real Groq eval harness against tests/fixtures/meetings/, spends real tokens
+```
 
 Verify UI changes in a real browser (Playwright MCP), not by build exit code.
 
@@ -46,13 +50,13 @@ Read `docs/ARCHITECTURE.md` §1 before proposing any backend work. The load-bear
 - `app/(app)/meetings/[id]/page.tsx` is **one page with Tabs** (notes / transcript / to-dos / email / ask). `docs/ARCHITECTURE.md` §4 shows these as sub-routes. Follow the code.
 - `docs` calls the cross-meeting board `actions/`; the code calls it `tasks/`.
 
-Pages are Server Components and `await` the mock getters directly. Only interactive leaves are `"use client"`.
+Pages are Server Components and `await` the `lib/mock/data.ts` getters directly (real queries now, see Data layer below). Only interactive leaves are `"use client"`.
 
-### Data layer swap contract
+### Data layer
 
-Every fixture in [lib/mock/data.ts](lib/mock/data.ts) is exposed behind an `async` getter matching the shape the real Supabase query will have (`getMeetings()`, `getMeeting(id)`, `getTranscript(meetingId)`, …). Keep those signatures — the backend swap should touch that one file. Types in [lib/types.ts](lib/types.ts) mirror the enums in `docs/DATA-MODEL.md`, so don't rename them casually.
+[lib/mock/data.ts](lib/mock/data.ts) — the name is a leftover from before the backend existed; every getter (`getMeetings()`, `getMeeting(id)`, `getTranscript(meetingId)`, …) now runs a real Supabase query via `server/models/*.ts`. The fixture arrays are gone. Keep the getter signatures stable — `page.tsx` call sites depend on them. Types in [lib/types.ts](lib/types.ts) mirror the enums in `docs/DATA-MODEL.md`, so don't rename them casually.
 
-Fixtures intentionally include the awkward cases (overdue to-do, guessed owners, purged audio, partly-failed meeting, "not in this recording" answer). Preserve them when editing.
+The old fixtures' awkward cases (overdue to-do, guessed owners, purged audio, partly-failed meeting, "not in this recording" answer) are now real states the app produces on its own — nothing to preserve by hand, just don't special-case them away.
 
 ## Design system: Room Tone
 
@@ -82,8 +86,8 @@ Copy is plain-language and non-technical — status labels read "Writing it down
 
 ## Docs
 
-`docs/ROADMAP.md` holds the six milestones and is the entry point for "what's next" (M0-M1 partially done: scaffold + UI exist; Supabase, auth, CI do not). `PRODUCT-REQUIREMENTS.md`, `DATA-MODEL.md`, `AI-PIPELINE.md`, `DEPLOYMENT.md`, `SECURITY-PRIVACY.md` cover their titles.
+`docs/GAP-ANALYSIS.md` is the entry point for "what's actually built and verified" — every P0-P3 item is resolved as of the latest scan. `docs/ROADMAP.md` is the original six-milestone plan, now historical (all milestones shipped) but kept for its per-task detail. `PRODUCT-REQUIREMENTS.md`, `DATA-MODEL.md`, `AI-PIPELINE.md`, `DEPLOYMENT.md`, `SECURITY-PRIVACY.md` cover their titles.
 
-`docs/ACTIVITY-LOG.md` is the running decision log — newest first, and it lists unresolved items (notably: Groq free-tier limits and model ids are unverified placeholders in `.env.example`). Append to it; do not auto-commit it.
+`docs/ACTIVITY-LOG.md` is the running decision log — newest first. Append to it; do not auto-commit it.
 
 New markdown files use ALL-CAPITALS filenames.

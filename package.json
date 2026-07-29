@@ -1,7 +1,14 @@
 {
   "name": "syncmind",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "AI meeting assistant: audio in, transcript/notes/action-items/follow-up email/calendar out. Runs entirely on free tiers.",
+  "author": "QUAN7UM",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dooddles07/SyncMind"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

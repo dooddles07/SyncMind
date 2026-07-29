@@ -1,5 +1,10 @@
 # SyncMind — Roadmap
 
+**All six milestones shipped.** This doc is now historical — kept for the
+per-task detail and estimates, not as a live tracker. See
+[GAP-ANALYSIS.md](GAP-ANALYSIS.md) for the current, actively-maintained
+record of what's built and verified.
+
 Six milestones to a launched MVP. Estimates assume one developer working focused days; they are sizing, not deadlines. Each milestone ends in something demonstrable — no milestone completes on "code written".
 
 ## M0 — Foundations

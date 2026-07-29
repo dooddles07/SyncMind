@@ -11,7 +11,7 @@ Verified by reading: 68 tracked files, `npm run build` (passes), `npm run typech
 | Layer | State |
 | --- | --- |
 | UI / design system | Done and good. 9 routes build, Room Tone tokens, motion, dark mode, a11y skip link. |
-| Data | Real Supabase queries behind every getter except `getUsage`. `lib/mock/data.ts`'s fixture arrays are gone. |
+| Data | Real Supabase queries behind every getter, including `getUsage`. `lib/mock/data.ts`'s fixture arrays are gone. |
 | Backend | Schema live, client factories live, auth live, real upload/transcription/analysis/email/ask pipeline live end-to-end. **M3 is fully done.** |
 | Auth | Live — Google OAuth, `middleware.ts`, session, route protection. |
 | AI | Transcription real (Groq Whisper). Analysis + email real (Llama 3.3 70B, single-pass only — map-reduce and the Gemini fallback deliberately deferred). Ask real (Llama 3.1 8B, Postgres full-text retrieval, no vector DB). |
@@ -20,7 +20,7 @@ Verified by reading: 68 tracked files, `npm run build` (passes), `npm run typech
 | Tests | Real. Vitest (61 unit tests), a real Groq eval harness (`npm run eval`, 5 hand-labeled fixtures), and Playwright E2E (one full-flow spec, sign-in stub + mocked Groq). See §2.9. |
 | Deploy | Repo pushed to `github.com/dooddles07/SyncMind`. **Vercel connected and live** at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/) — confirmed via `/api/health`. |
 
-Roughly: M0 partially done, M1 UI-only, M2-M5 not started.
+Roughly: M0-M5 all shipped. Every P0-P3 item below is resolved.
 
 ---
 

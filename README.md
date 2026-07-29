@@ -8,13 +8,16 @@ Built to run entirely on free tiers: Next.js on Vercel, Supabase for data and au
 
 ## Status
 
-**Live:** [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/)
+**Live and fully built:** [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/)
 
-The UI is complete and deployed, running entirely on fixture data from
-[lib/mock/data.ts](lib/mock/data.ts) — there is no Supabase, no AI calls, and no auth
-yet. What you see live is the real interface with no backend behind it. See
-`docs/ROADMAP.md` for what's built (M0 substantially done) versus what's next (M1
-onward), and `docs/GAP-ANALYSIS.md` for the current, actively-maintained punch list.
+Real end-to-end pipeline, not a fixture shell: Supabase Postgres + Auth + Storage,
+Google OAuth sign-in, Groq Whisper transcription, Llama-based minutes/action-item
+extraction and follow-up email drafting, Gmail compose links and `.ics` calendar
+export, resumable upload/processing that survives a closed tab. Covered by real
+tests — Vitest unit tests, a Groq eval harness (`npm run eval`) scoring analysis
+quality against hand-labeled fixtures, and a Playwright E2E suite exercising the
+full upload → ready → share flow, all green in CI. `docs/GAP-ANALYSIS.md` is the
+actively-maintained record of what was built and verified, session by session.
 
 ## Documentation
 
@@ -43,14 +46,23 @@ Total running cost: **$0**. Every limit and its workaround is documented in `doc
 git clone https://github.com/dooddles07/SyncMind.git && cd SyncMind && npm install
 ```
 
+Needs a real Supabase project and API keys to run the full app — this isn't a
+fixture demo. Copy `.env.example` to `.env.local` and fill it in, then:
+
 ```bash
+supabase link --project-ref <ref> && supabase db push   # apply migrations
 npm run dev
 ```
 
-That's enough to run the full UI locally against fixtures — no `.env.local` needed yet.
-`.env.example` documents the variables the backend will read once it exists (Supabase,
-Groq, Google sign-in); filling them in today does nothing, since nothing reads them.
-See `docs/DEPLOYMENT.md` for what each one is for when that work starts.
+`docs/DEPLOYMENT.md` has the full walkthrough: creating the Supabase/Groq/Google
+accounts, where each env var comes from, the storage bucket + RLS setup, and
+Vercel deploy steps. All of it runs on free tiers, $0 total.
+
+```bash
+npm test        # Vitest unit tests
+npm run test:e2e  # Playwright E2E (needs E2E_TEST_SECRET in .env.local)
+npm run eval     # Groq analysis-quality eval harness (spends real Groq tokens)
+```
 
 ## Repository
 
