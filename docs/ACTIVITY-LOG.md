@@ -4,6 +4,64 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-28 — P1.1: Supabase project created, schema applied and verified
+
+**Done:** the actual start of the real backend build. User created the Supabase
+project through the dashboard (org `QUAN7UM`, project `syncmind`, region
+`ap-southeast-1`/Singapore — closest to their location). Project ref
+`keqagpktcrwuovkuqwno`.
+
+- Installed the Supabase CLI (`npm install -g supabase`, v2.110.0 — worked directly,
+  no longer blocked the way older CLI versions were).
+- `supabase login` needed a real interactive terminal (this session's Bash tool is
+  non-TTY, browser-based OAuth login can't run through it) — user ran it in their own
+  PowerShell window. Hit Windows' default script-execution-policy block on the npm
+  `.ps1` shim; worked around with `supabase.cmd login` rather than changing the
+  system's execution policy (a global security setting, not something to touch for a
+  local CLI login).
+- `supabase link --project-ref keqagpktcrwuovkuqwno` and `supabase init` — both run
+  from this end once login succeeded, since linking/config scaffolding don't touch
+  credentials that need to stay out of chat. `supabase/config.toml` created.
+- **8 migrations**, transcribed exactly from `docs/DATA-MODEL.md` §2-§5 (enums,
+  profiles+trigger, meetings+chunks, transcripts, summaries/actions/email,
+  share/ask/usage, RLS policies on all 10 tables individually — not the doc's
+  "repeat this shape" placeholder — storage bucket+policies). Created with
+  `supabase migration new <name>` for real timestamped filenames rather than the
+  doc's illustrative `0001_x.sql` numbering, since that's what `supabase db push`
+  actually expects.
+- Re-checked `DATA-MODEL.md` for staleness against the earlier OAuth-drop decision
+  (P0.1) before writing SQL against it — already clean, no `google_connections`
+  table, no `gmail_draft_id`. Good that it was checked rather than assumed.
+- `supabase db push --linked --dry-run` first to validate before applying for real.
+  Push itself showed unrelated Docker errors (a local migration-catalog caching step
+  that needs Docker Desktop, which isn't installed) — did not treat the push as
+  failed on Docker noise alone; re-ran `--dry-run` afterward and got
+  `"upToDate":true"` confirming the real remote push succeeded independent of the
+  Docker step.
+- **Verified against the live database with real queries, not just "push didn't
+  error":** all 10 tables present with `rowsecurity = true`, 13 policies (10
+  owner-only + 3 storage), `recordings` bucket exists and is private,
+  `on_auth_user_created` trigger exists. Used `supabase db query` for all of this —
+  authenticates through the already-logged-in CLI session, never touched the DB
+  password.
+- Generated types: `supabase gen types typescript --linked` into
+  `server/models/database.types.ts` — not `lib/supabase/types.ts` as `DATA-MODEL.md`
+  §8 previously said, corrected to match the `server/` convention locked earlier this
+  session. `docs/DATA-MODEL.md` §8 updated to reflect both the real filename
+  convention and the corrected types path.
+- `npm run typecheck`, `lint`, `test` all stay green with the new generated file
+  present (nothing imports it yet, so this only confirms it's valid TypeScript).
+
+**Never touched:** the database password, the anon key, the service-role key. All
+CLI operations authenticated through the login session or the management API, none
+needed the raw Postgres credential.
+
+**Next: P1.2** — `server/config/supabase.ts` client factories (browser/server/admin).
+This genuinely needs the anon key and service-role key from Settings → API — paste
+those into `.env.local` yourself, never into chat.
+
+---
+
 ## 2026-07-28 — Backend folder structure locked: server/ with MVC-style layers
 
 **Done:** the user wants a controller/model/middleware/config/utils convention for

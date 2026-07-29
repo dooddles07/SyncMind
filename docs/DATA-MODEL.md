@@ -376,17 +376,31 @@ Comfortable. Storage (1 GB) binds first: a 1-hour meeting at 16 kHz mono Opus is
 
 ## 8. Migrations
 
-Numbered SQL files under `supabase/migrations/`, applied with the Supabase CLI. Never edit an applied migration; add a new one.
+**Done, applied 2026-07-28** against the live project (`syncmind`,
+`ap-southeast-1`). SQL files under `supabase/migrations/`, created with
+`supabase migration new <name>` — real CLI-generated `<timestamp>_<name>.sql`
+filenames, not the illustrative `0001_x.sql` numbering originally sketched here.
+Applied with `supabase db push --linked`. Never edit an applied migration; add a new
+one.
 
 ```
-0001_enums.sql
-0002_profiles_and_trigger.sql
-0003_meetings_and_chunks.sql
-0004_transcripts.sql
-0005_summaries_actions_email.sql
-0006_share_ask_usage.sql
-0007_rls_policies.sql
-0008_storage_bucket_and_policies.sql
+<ts>_enums.sql
+<ts>_profiles_and_trigger.sql
+<ts>_meetings_and_chunks.sql
+<ts>_transcripts.sql
+<ts>_summaries_actions_email.sql
+<ts>_share_ask_usage.sql
+<ts>_rls_policies.sql
+<ts>_storage_bucket_and_policies.sql
 ```
 
-Types are generated into `lib/supabase/types.ts` with `supabase gen types typescript`; regenerate after every migration and commit the result.
+Verified against the live database, not just "migration ran without error": all 10
+tables exist with `rowsecurity = true`, 13 policies total (10 owner-only + 3 storage),
+the `recordings` bucket exists and is private, the `on_auth_user_created` trigger
+exists.
+
+Types are generated into `server/models/database.types.ts` (not `lib/supabase/types.ts`
+— per the `server/` backend convention locked in `ARCHITECTURE.md` §4, generated
+table types belong in `server/models/`, the only layer allowed to import a Supabase
+client) with `supabase gen types typescript --linked`; regenerate after every
+migration and commit the result.

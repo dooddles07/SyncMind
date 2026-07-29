@@ -12,7 +12,7 @@ Verified by reading: 68 tracked files, `npm run build` (passes), `npm run typech
 | --- | --- |
 | UI / design system | Done and good. 9 routes build, Room Tone tokens, motion, dark mode, a11y skip link. |
 | Data | 100% fixtures in `lib/mock/data.ts` behind async getters. |
-| Backend | Does not exist. No `app/api/**`, no `lib/supabase/**`, no `supabase/migrations/**`. |
+| Backend | Schema live (10 tables, RLS, storage bucket, all verified). No client factories, no real `app/api/**` routes yet — only `/api/health`. |
 | Auth | Does not exist. No `middleware.ts`, no session, no route protection. |
 | AI | Does not exist. No Groq/Gemini client, no `lib/quota.ts`, no prompts. |
 | Integrations | Resolved — no OAuth needed. `lib/export/gmail.ts` + `lib/export/ics.ts`. |
@@ -109,8 +109,8 @@ land under `server/`, organized by layer, not by domain.
 
 | # | Gap | Why it blocks |
 | --- | --- | --- |
-| 1.1 | No Supabase project, no `supabase/migrations/**` | Nothing can persist. `DATA-MODEL.md` has the schema; none of it is applied. **Blocked on you**: create a free Supabase project (supabase.com, pick a region, save the DB password) — external signup, same shape as Groq/Sentry. See `docs/ACTIVITY-LOG.md` for the exact next steps. |
-| 1.2 | No `server/config/supabase.ts` (client factories), no `server/models/`, no generated types | Every page still imports `lib/mock/data`. |
+| 1.1 | ~~No Supabase project, no `supabase/migrations/**`~~ **Resolved** | Project live (`syncmind`, `ap-southeast-1`). 8 migrations applied and verified: all 10 tables, RLS enabled on every one, 13 policies, private `recordings` bucket, `on_auth_user_created` trigger — confirmed via real queries against the live DB, not just "push didn't error." See `docs/DATA-MODEL.md` §8. |
+| 1.2 | `server/models/database.types.ts` generated; `server/config/supabase.ts` (client factories) still missing | Types exist, nothing reads them yet. Every page still imports `lib/mock/data`. **Blocked on you** for the client-factory step specifically: need the anon key and service-role key from Settings → API — never paste these into chat, they go straight into `.env.local`. |
 | 1.3 | No auth: no Google sign-in, no `middleware.ts`, no `/auth/callback` | `/dashboard`, `/settings`, `/tasks`, `/meetings/[id]` are all publicly reachable and always will be until middleware exists. |
 | 1.4 | `app/api/**` has one route (`/api/health`, now the worked MVC example) — everything else missing | `POST /api/meetings`, `POST /api/pipeline/advance`, `GET /api/meetings/:id/status`, `/api/pipeline/retry` — none exist. |
 | 1.5 | No `lib/quota.ts` | Referenced by `CLAUDE.md` and `ARCHITECTURE.md`; deliberately not moved into `server/` (see `ARCHITECTURE.md` §4) since `CLAUDE.md` already names its path — revisit when it's actually built. Without it the first heavy day hits a raw upstream 429 instead of the designed `quota_blocked` state. |
@@ -178,5 +178,6 @@ Nothing in the recommended stack requires a payment method at any step.
 2. ~~P2.6 connect Vercel~~ **Already done**, discovered mid-session — live at [sync-mind-three.vercel.app](https://sync-mind-three.vercel.app/).
 3. ~~P2.1, P2.2, P2.6, P2.7, P2.8~~ **All done.** Every "fix what's wrong" P2 item is closed — what's left is genuinely new build work.
 4. ~~P2.4, P2.5~~ **Done** — error/not-found UI and OG image/robots/sitemap shipped. The demo now looks finished when shared, and it already has a real URL to share.
-5. ~~P2.9~~ **Partially done** (Vitest + 28 tests; Playwright + chunker tests wait on P1). ~~P2.10~~ **Wired**, pending you creating a Sentry project. Every standalone P2 item is now closed or waiting on P1. Backend folder structure locked (`server/`, MVC-style layers) with `/api/health` as the worked example. P1.1 → P1.13 in order — the real build, M1 through M3 — is what's left, blocked first on you creating the Supabase project.
-6. P3.
+5. ~~P2.9~~ **Partially done** (Vitest + 28 tests; Playwright + chunker tests wait on P1). ~~P2.10~~ **Wired**, pending you creating a Sentry project. Every standalone P2 item is now closed or waiting on P1. Backend folder structure locked (`server/`, MVC-style layers) with `/api/health` as the worked example.
+6. ~~P1.1~~ **Done** — Supabase project live, 8 migrations applied and verified against the real database. P1.2 next: client factories in `server/config/supabase.ts`, blocked on you for the anon/service-role keys (Settings → API, never pasted into chat).
+7. P3.
