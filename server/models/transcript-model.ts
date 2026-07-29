@@ -18,9 +18,6 @@ export async function getSegmentsForMeeting(
   return data;
 }
 
-/** Speaker labels aren't a table of their own -- they're the distinct `speaker`
- *  values already stored on each segment. Empty for a meeting with no transcript
- *  yet, which is real, not a fallback. */
 /** Absolute end_sec of the meeting's last stored segment -- what shiftAndDedupe
  *  needs to know how much of the next chunk's overlap window is already covered.
  *  null for the meeting's first chunk. */
@@ -86,6 +83,28 @@ export async function insertStitchedSegments(
   if (error) throw error;
 }
 
+/** Applies the analysis pass's inferred speaker ranges to every segment falling
+ *  inside each range. Best-effort: a range with no matching segments is a no-op,
+ *  not an error. */
+export async function applySpeakerRanges(
+  supabase: SupabaseClient<Database>,
+  meetingId: string,
+  ranges: { fromSec: number; toSec: number; speakerLabel: string }[],
+): Promise<void> {
+  for (const range of ranges) {
+    const { error } = await supabase
+      .from("transcript_segments")
+      .update({ speaker: range.speakerLabel })
+      .eq("meeting_id", meetingId)
+      .gte("start_sec", range.fromSec)
+      .lt("start_sec", range.toSec);
+    if (error) throw error;
+  }
+}
+
+/** Speaker labels aren't a table of their own -- they're the distinct `speaker`
+ *  values already stored on each segment. Empty for a meeting with no transcript
+ *  yet, which is real, not a fallback. */
 export async function getSpeakerLabelsForMeeting(
   supabase: SupabaseClient<Database>,
   meetingId: string,

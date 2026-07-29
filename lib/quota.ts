@@ -9,6 +9,8 @@ import type { Database } from "@/server/models/database.types";
 
 const DAILY_AUDIO_SECONDS = Number(process.env.GROQ_DAILY_AUDIO_SECONDS ?? 28800);
 const DAILY_ASR_CALLS = Number(process.env.GROQ_DAILY_ASR_CALLS ?? 2000);
+const DAILY_LLM_CALLS = Number(process.env.GROQ_DAILY_LLM_CALLS ?? 1000);
+const DAILY_LLM_TOKENS = Number(process.env.GROQ_DAILY_LLM_TOKENS ?? 100000);
 
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
@@ -28,20 +30,27 @@ export type QuotaCheck = { ok: true } | { ok: false; resumeAt: string };
 export async function checkAndReserve(
   supabase: SupabaseClient<Database>,
   userId: string,
-  projected: { audioSeconds: number },
+  projected: { audioSeconds?: number; llmTokens?: number },
 ): Promise<QuotaCheck> {
   const { data, error } = await supabase
     .from("usage_daily")
-    .select("audio_seconds, asr_calls")
+    .select("audio_seconds, asr_calls, llm_calls, llm_tokens")
     .eq("user_id", userId)
     .eq("day", todayUtc())
     .maybeSingle();
   if (error) throw error;
 
-  const audioSeconds = (data?.audio_seconds ?? 0) + projected.audioSeconds;
-  const asrCalls = (data?.asr_calls ?? 0) + 1;
+  const audioSeconds = (data?.audio_seconds ?? 0) + (projected.audioSeconds ?? 0);
+  const asrCalls = (data?.asr_calls ?? 0) + (projected.audioSeconds !== undefined ? 1 : 0);
+  const llmCalls = (data?.llm_calls ?? 0) + (projected.llmTokens !== undefined ? 1 : 0);
+  const llmTokens = (data?.llm_tokens ?? 0) + (projected.llmTokens ?? 0);
 
-  if (audioSeconds > DAILY_AUDIO_SECONDS || asrCalls > DAILY_ASR_CALLS) {
+  if (
+    audioSeconds > DAILY_AUDIO_SECONDS ||
+    asrCalls > DAILY_ASR_CALLS ||
+    llmCalls > DAILY_LLM_CALLS ||
+    llmTokens > DAILY_LLM_TOKENS
+  ) {
     return { ok: false, resumeAt: nextUtcMidnight() };
   }
   return { ok: true };
@@ -54,12 +63,14 @@ export async function checkAndReserve(
  *  can never inflate or reset someone else's quota. */
 export async function recordUsage(
   supabase: SupabaseClient<Database>,
-  usage: { audioSeconds: number },
+  usage: { audioSeconds?: number; llmTokens?: number },
 ): Promise<void> {
   const { error } = await supabase.rpc("increment_usage_daily", {
     p_day: todayUtc(),
-    p_audio_seconds: usage.audioSeconds,
-    p_asr_calls: 1,
+    p_audio_seconds: usage.audioSeconds ?? 0,
+    p_asr_calls: usage.audioSeconds !== undefined ? 1 : 0,
+    p_llm_calls: usage.llmTokens !== undefined ? 1 : 0,
+    p_llm_tokens: usage.llmTokens ?? 0,
   });
   if (error) throw error;
 }

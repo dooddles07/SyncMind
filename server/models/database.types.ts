@@ -572,7 +572,13 @@ export type Database = {
     }
     Functions: {
       increment_usage_daily: {
-        Args: { p_asr_calls: number; p_audio_seconds: number; p_day: string }
+        Args: {
+          p_asr_calls: number
+          p_audio_seconds: number
+          p_day: string
+          p_llm_calls?: number
+          p_llm_tokens?: number
+        }
         Returns: undefined
       }
     }

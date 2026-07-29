@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { checkAndReserve, recordUsage } from "@/lib/quota";
+import { AnalysisTooLongError, QuotaBlockedError, analyzeMeeting } from "@/server/controllers/analysis-controller";
 import { GroqRateLimitError, transcribeChunk } from "@/server/config/groq";
 import {
   claimNextChunkToTranscribe,
@@ -15,7 +16,9 @@ import {
   markMeetingFailed,
   markMeetingQuotaBlocked,
   updateMeetingStatus,
+  type MeetingRow,
 } from "@/server/models/meeting-model";
+import { getSummaryForMeeting } from "@/server/models/summary-model";
 import {
   getCarryoverPrompt,
   getLastStoredEndSec,
@@ -30,6 +33,10 @@ export interface PipelineStatus {
   chunksDone: number;
   chunksTotal: number;
   error: string | null;
+  // Meeting status stays "analyzing" even once minutes/action items are real
+  // (docs/ARCHITECTURE.md's "ready" also requires the email draft, M3 slice 2) --
+  // this is the poller's only signal that this specific unit of work is done.
+  analysisReady: boolean;
 }
 
 /** Also the poll target's controller (GET /api/meetings/:id/status) -- same shape
@@ -41,22 +48,26 @@ export async function currentStatus(
   const meeting = await getMeetingById(supabase, meetingId);
   if (!meeting) throw new HttpError(404, "Meeting not found.");
   const chunksDone = await countDoneChunks(supabase, meetingId);
+  const analysisReady =
+    meeting.status === "analyzing" ? (await getSummaryForMeeting(supabase, meetingId)) !== null : false;
   return {
     status: meeting.status,
     stageDetail: meeting.stage_detail,
     chunksDone,
     chunksTotal: meeting.chunk_count,
     error: meeting.error_message,
+    analysisReady,
   };
 }
 
 /**
  * Does exactly one unit of work and returns, per docs/ARCHITECTURE.md section 3.3 --
- * transcribe one pending chunk, or flip to "analyzing" once none are left. Idempotent:
- * calling this on a meeting that isn't "transcribing" is a safe no-op that just
- * reports the current state, and losing the chunk-claim race to a concurrent call
+ * transcribe one pending chunk, flip to "analyzing" once none are left, or run the
+ * single-pass analysis for an "analyzing" meeting. Idempotent: calling this on a
+ * meeting that's neither "transcribing" nor "analyzing" is a safe no-op that just
+ * reports the current state; losing the chunk-claim race to a concurrent call
  * (docs/ARCHITECTURE.md section 7: "advisory lock contention -> return current state,
- * not an error") behaves the same way.
+ * not an error") and re-advancing an already-analyzed meeting both behave the same way.
  */
 export async function advance(
   supabase: SupabaseClient<Database>,
@@ -64,6 +75,10 @@ export async function advance(
 ): Promise<PipelineStatus> {
   const meeting = await getMeetingById(supabase, meetingId);
   if (!meeting) throw new HttpError(404, "Meeting not found.");
+
+  if (meeting.status === "analyzing") {
+    return advanceAnalysis(supabase, meeting);
+  }
 
   if (meeting.status !== "transcribing") {
     return currentStatus(supabase, meetingId);
@@ -87,6 +102,7 @@ export async function advance(
       chunksDone: meeting.chunk_count,
       chunksTotal: meeting.chunk_count,
       error: null,
+      analysisReady: false,
     };
   }
 
@@ -102,6 +118,7 @@ export async function advance(
       chunksDone: 0,
       chunksTotal: meeting.chunk_count,
       error: null,
+      analysisReady: false,
     };
   }
 
@@ -136,6 +153,7 @@ export async function advance(
         chunksDone: 0,
         chunksTotal: meeting.chunk_count,
         error: null,
+        analysisReady: false,
       };
     }
 
@@ -156,8 +174,81 @@ export async function advance(
       chunksDone: 0,
       chunksTotal: meeting.chunk_count,
       error: "Part of the audio did not come through.",
+      analysisReady: false,
     };
   }
 
   return currentStatus(supabase, meetingId);
+}
+
+/**
+ * One unit of work for an "analyzing" meeting: run the single-pass analysis and
+ * persist minutes + action items. Idempotent -- a meeting with a summaries row
+ * already has done this, so a re-triggered advance is a safe no-op rather than a
+ * second Groq call.
+ */
+async function advanceAnalysis(
+  supabase: SupabaseClient<Database>,
+  meeting: MeetingRow,
+): Promise<PipelineStatus> {
+  const existingSummary = await getSummaryForMeeting(supabase, meeting.id);
+  if (existingSummary) {
+    return currentStatus(supabase, meeting.id);
+  }
+
+  try {
+    await analyzeMeeting(supabase, meeting);
+  } catch (err) {
+    if (err instanceof QuotaBlockedError) {
+      await markMeetingQuotaBlocked(supabase, meeting.id, err.resumeAt);
+      return {
+        status: "quota_blocked",
+        stageDetail: `Paused until ${err.resumeAt}`,
+        chunksDone: meeting.chunk_count,
+        chunksTotal: meeting.chunk_count,
+        error: null,
+        analysisReady: false,
+      };
+    }
+    if (err instanceof GroqRateLimitError) {
+      const resumeAt = new Date(Date.now() + err.retryAfterSec * 1000).toISOString();
+      await markMeetingQuotaBlocked(supabase, meeting.id, resumeAt);
+      return {
+        status: "quota_blocked",
+        stageDetail: `Paused until ${resumeAt}`,
+        chunksDone: meeting.chunk_count,
+        chunksTotal: meeting.chunk_count,
+        error: null,
+        analysisReady: false,
+      };
+    }
+    if (err instanceof AnalysisTooLongError) {
+      const message = "This meeting is too long to analyze yet.";
+      await markMeetingFailed(supabase, meeting.id, "ANALYZE_TOO_LONG", message);
+      return {
+        status: "failed",
+        stageDetail: null,
+        chunksDone: meeting.chunk_count,
+        chunksTotal: meeting.chunk_count,
+        error: message,
+        analysisReady: false,
+      };
+    }
+
+    // structured-output.ts already exhausted its own repair attempt before
+    // throwing, so any other error here is the documented ANALYZE_INVALID_OUTPUT
+    // case (docs/AI-PIPELINE.md section 5), not a first failure to retry later.
+    const message = "Could not make sense of this meeting.";
+    await markMeetingFailed(supabase, meeting.id, "ANALYZE_INVALID_OUTPUT", message);
+    return {
+      status: "failed",
+      stageDetail: null,
+      chunksDone: meeting.chunk_count,
+      chunksTotal: meeting.chunk_count,
+      analysisReady: false,
+      error: message,
+    };
+  }
+
+  return currentStatus(supabase, meeting.id);
 }

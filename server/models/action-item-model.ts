@@ -4,6 +4,7 @@ import type { Database } from "@/server/models/database.types";
 export type ActionItemRow = Database["public"]["Tables"]["action_items"]["Row"] & {
   meetings: { title: string } | null;
 };
+export type ActionItemInsert = Database["public"]["Tables"]["action_items"]["Insert"];
 
 /** No meetingId = every action item across all the caller's meetings, for the
  *  cross-meeting board at /tasks. RLS already scopes this to the caller. Joins the
@@ -20,4 +21,13 @@ export async function getActionItems(
   const { data, error } = await query;
   if (error) throw error;
   return data;
+}
+
+export async function insertActionItems(
+  supabase: SupabaseClient<Database>,
+  items: ActionItemInsert[],
+): Promise<void> {
+  if (items.length === 0) return;
+  const { error } = await supabase.from("action_items").insert(items);
+  if (error) throw error;
 }

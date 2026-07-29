@@ -4,6 +4,67 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (M3 slice 1) — real analysis: minutes + action items (single-pass)
+
+**Done:** a meeting stuck at `"analyzing"` since the transcription pass now actually
+gets analyzed — real minutes and action items, single-pass only (map-reduce and the
+Gemini fallback both remain deliberately deferred, per the scoped plan). Verified live
+end-to-end against "Introduction Video", a real 84-second self-intro recording.
+
+- `server/config/analysis-schema.ts`, `server/utils/structured-output.ts`,
+  `server/utils/text-similarity.ts` (+8 unit tests) — the Zod schema, the
+  validate-then-one-repair-attempt loop, and the Levenshtein near-duplicate helper
+  from `AI-PIPELINE.md` §3/§5, verbatim.
+- `server/config/groq.ts` — added `runStructuredCompletion`, a generic JSON-mode
+  chat completion, reusing the existing retry ladder alongside `transcribeChunk`.
+- **Real bug found via live testing, not assumed:** the documented system prompt
+  (§3) states the RULES but never actually spells out the JSON key names, and
+  Groq's `response_format: { type: "json_object" }` is *not* schema-aware the way
+  `json_schema` mode is — it just forces valid JSON, not a particular shape. First
+  live call came back with the model's own guessed shape (`meetingTitle`,
+  `duration` echoed back, no `overview` field, attendees missing `speakerLabel`/
+  `confidence`), failing validation twice and landing the meeting in `failed`
+  exactly as designed — but for the wrong reason. Fixed by appending an explicit
+  key-by-key SCHEMA block to the system prompt in
+  `server/controllers/analysis-controller.ts`; re-verified live afterward with a
+  fully valid response on the first attempt.
+- `server/controllers/analysis-controller.ts` — `analyzeMeeting(supabase, meeting)`:
+  serializes the transcript, estimates tokens and throws `AnalysisTooLongError`
+  over the ~5,000-token single-pass safe limit (map-reduce territory, deferred),
+  quota-checks via the extended `lib/quota.ts`, runs the structured call, applies
+  the documented post-validation clamps (`atSec` clamped to `duration_sec`, past
+  `dueDate` nulled, sub-8-char titles dropped, near-duplicate titles merged keeping
+  the earliest `atSec`), and persists via `upsertSummary` + `insertActionItems` +
+  `applySpeakerRanges`.
+- `lib/quota.ts` — `checkAndReserve`/`recordUsage` extended to also track
+  `llmCalls`/`llmTokens` against `GROQ_DAILY_LLM_CALLS`/`GROQ_DAILY_LLM_TOKENS`.
+  Required a Postgres migration to `increment_usage_daily` — **second real finding**:
+  `CREATE OR REPLACE FUNCTION` with a changed parameter list creates a new overload
+  rather than replacing the function (Postgres identifies functions by name +
+  parameter types), confirmed by querying `pg_proc` and finding two rows for the
+  same `proname` after the first migration. Fixed with a follow-up migration
+  dropping the stale 3-param overload; re-verified only one 5-param version remains.
+- `server/controllers/pipeline-controller.ts` — `advance()` gained an `"analyzing"`
+  branch (`advanceAnalysis`), idempotent: a meeting with an existing `summaries` row
+  is treated as already done and skips straight to `currentStatus` without a second
+  Groq call. Verified directly: re-running `advance()` against an already-analyzed
+  meeting returned instantly with `analysisReady: true` and made no Groq request.
+  Since `meetings.status` intentionally stays `"analyzing"` even once minutes/action
+  items are real (`"ready"` also needs the email draft, M3 slice 2 — not built yet),
+  `PipelineStatus` gained an `analysisReady` boolean as the poller's actual
+  done-signal; `components/app/pipeline-poller.tsx` now polls through `"analyzing"`
+  too and stops once `analysisReady` flips true, refreshing the page's server data
+  at that point rather than on every still-working tick.
+- **Live verification (real Supabase queries, not just the UI):** `summaries` row
+  has a real `user_id` (the actual browser session's auth uid, not a service-role
+  key), a real generated `overview` referencing actual transcript content ("Brixton
+  Romero... Naga College Foundation..."), 3 real `topics`. `usage_daily` for that day
+  shows `llm_calls: 1`, `llm_tokens: 1239` — real Groq usage, not placeholders. Zero
+  `action_items` rows, correctly — a 1-minute self-intro has no commitments to
+  extract, and the model correctly returned an empty array rather than inventing one.
+- Verification: `npm run typecheck`, `lint`, `test` (45 tests total, 8 new for
+  `text-similarity.ts`), `build` all green.
+
 ## 2026-07-29 (M2 slice 1) — real transcription: quota, Groq client, /api/pipeline/advance
 
 **Done:** the next real feature after the upload pipeline — a stuck `"transcribing"`
