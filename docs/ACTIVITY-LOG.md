@@ -4,6 +4,36 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-07-29 (production incident) — live site down: Vercel env vars never synced
+
+**What happened:** the previous commit (real upload pipeline + `middleware.ts`)
+deployed cleanly but took the live site down — `500 MIDDLEWARE_INVOCATION_FAILED` on
+every request, since `middleware.ts`'s matcher covers almost the whole site.
+
+**Root cause:** `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` only
+ever existed in `.env.local` (gitignored, local-only). `docs/DEPLOYMENT.md` §2 always
+said "set the same keys in Vercel for Preview and Production," but nothing in this
+session ever actually confirmed that had been done — earlier verification only
+checked that the Vercel *project* was connected and deploying (`GAP-ANALYSIS.md`
+P2.6), which is a different fact from "the env vars it needs at runtime are set."
+Every prior commit before `middleware.ts` existed happened to work anyway (nothing
+read those env vars at request time on every route), so the gap stayed invisible
+until middleware made it universal.
+
+**Fixed:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL` added in Vercel → Settings →
+Environment Variables (Production + Preview), redeployed. Verified live, not just
+"looks fixed": `/` → `200`, `/dashboard` → `307` to `/login` (middleware running
+again, correctly), `/api/health` → `200` with the deployed commit SHA.
+
+**Lesson, applied going forward:** "Vercel is connected" and "Vercel has the env vars
+the app actually needs" are two separate facts — the first was verified early this
+session (P2.6), the second never was until it broke production. Every future env var
+added to `.env.example` should get a matching check (or at least a reminder) against
+the actual Vercel dashboard, not just local `.env.local`.
+
+---
+
 ## 2026-07-29 (later still) — Real upload pipeline: ffmpeg chunker, POST /api/meetings, full getter swap
 
 **Done:** the actual prerequisite for everything downstream. Before this, no real
