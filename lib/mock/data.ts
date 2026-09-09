@@ -50,6 +50,7 @@ function toMeeting(row: MeetingRow): Meeting {
     chunksTotal: row.chunk_count,
     audioAvailable: row.audio_purged_at === null,
     note: row.error_message ?? undefined,
+    errorCode: row.error_code,
   };
 }
 

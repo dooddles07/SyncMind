@@ -82,6 +82,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
           meetingId={meeting.id}
           initialStatus={meeting.status}
           initialDetail={meeting.note ?? statusCopy[meeting.status].hint}
+          initialErrorCode={meeting.errorCode}
         />
       </div>
 
@@ -100,6 +101,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
           </TabsContent>
           <TabsContent value="transcript">
             <TranscriptPanel
+              meetingId={meeting.id}
               segments={segments}
               speakers={speakers}
               duration={meeting.duration}

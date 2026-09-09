@@ -68,6 +68,8 @@ export interface Meeting {
   chunksTotal: number;
   audioAvailable: boolean;
   note?: string;
+  /** Set only when status is "failed" -- names which stage broke. */
+  errorCode?: string | null;
 }
 
 export interface EmailDraft {
@@ -127,6 +129,28 @@ export const statusCopy: Record<MeetingStatus, { label: string; hint: string }> 
   transcribing: { label: "Writing it down", hint: "Turning the audio into text" },
   analyzing: { label: "Picking out the important bits", hint: "Finding decisions and to-dos" },
   ready: { label: "Ready", hint: "Everything is done" },
-  failed: { label: "Something went wrong", hint: "Part of the audio did not come through" },
+  // Deliberately stage-neutral: this is only the fallback for when no real error
+  // message came back. The specific cause (which stage, what went wrong) comes
+  // from meetings.error_message and is shown in its place whenever it exists.
+  failed: { label: "Something went wrong", hint: "This meeting stopped partway through" },
   quota_blocked: { label: "Paused until tomorrow", hint: "You have used today's free minutes" },
 };
+
+/**
+ * Which pipeline stage an error_code belongs to, as an index into the status
+ * stepper's stages. Transcription used to be hardcoded here, so an analysis or
+ * email failure still put the warning on "Written down" and told the user their
+ * audio was bad when it wasn't.
+ */
+export function failedStageIndex(errorCode?: string | null): number {
+  switch (errorCode) {
+    case "TRANSCRIBE_FAILED":
+      return 1;
+    case "ANALYZE_TOO_LONG":
+    case "ANALYZE_INVALID_OUTPUT":
+    case "EMAIL_INVALID_OUTPUT":
+      return 2;
+    default:
+      return 1;
+  }
+}

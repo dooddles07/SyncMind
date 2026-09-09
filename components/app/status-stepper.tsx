@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Check, Clock } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import type { MeetingStatus } from "@/lib/types";
+import { failedStageIndex, type MeetingStatus } from "@/lib/types";
 import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 
@@ -19,13 +19,27 @@ const order: Record<string, number> = { uploading: 0, transcribing: 1, analyzing
  * Stage is never carried by motion or colour alone. Each step shows an icon and a word,
  * so it still reads with animations off and for anyone who cannot see the accent colour.
  */
-export function StatusStepper({ status, detail }: { status: MeetingStatus; detail?: string }) {
+export function StatusStepper({
+  status,
+  detail,
+  errorCode,
+}: {
+  status: MeetingStatus;
+  detail?: string;
+  errorCode?: string | null;
+}) {
   const reduced = useReducedMotion();
   const mounted = useMounted();
   const pulse = mounted && !reduced;
   const broken = status === "failed" || status === "quota_blocked";
   // "ready" sits past the last stage so every step reads as done, not still working
-  const current = broken ? 1 : status === "ready" ? stages.length : order[status];
+  const current = broken
+    ? status === "quota_blocked"
+      ? 1
+      : failedStageIndex(errorCode)
+    : status === "ready"
+      ? stages.length
+      : order[status];
 
   return (
     <div aria-live="polite" className="flex flex-col gap-2">

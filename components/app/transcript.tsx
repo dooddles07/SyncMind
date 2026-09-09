@@ -1,9 +1,10 @@
 "use client";
 
 import { Pause, Play, RotateCcw, RotateCw, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { locateChunk, type PlayableChunk } from "@/lib/audio/playlist";
 import { formatTimecode, type Segment, type Speaker } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -27,11 +28,13 @@ export function SpeakerChip({ speaker }: { speaker: Speaker | undefined }) {
 }
 
 export function TranscriptPanel({
+  meetingId,
   segments,
   speakers,
   duration,
   audioAvailable,
 }: {
+  meetingId: string;
   segments: Segment[];
   speakers: Speaker[];
   duration: number;
@@ -40,11 +43,108 @@ export function TranscriptPanel({
   const [query, setQuery] = useState("");
   const [at, setAt] = useState(segments[0]?.at ?? 0);
   const [playing, setPlaying] = useState(false);
+  const [chunks, setChunks] = useState<PlayableChunk[] | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  // Which chunk object is loaded into the element, and where to jump once it has
+  // enough metadata to accept a currentTime (setting it straight after src is a no-op).
+  const loadedIndex = useRef<number | null>(null);
+  const pendingOffset = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!audioAvailable) return;
+    let cancelled = false;
+    fetch(`/api/meetings/${meetingId}/audio`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.chunks) setChunks(data.chunks as PlayableChunk[]);
+      })
+      .catch(() => {
+        // Playback stays unavailable; the transcript itself is unaffected.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [meetingId, audioAvailable]);
+
+  /** Moves playback to a position in the whole recording, loading whichever chunk
+   *  holds it first. Every seek in this component goes through here. */
+  const seek = useCallback(
+    (target: number, play = false) => {
+      const clamped = Math.max(0, Math.min(target, duration));
+      setAt(clamped);
+
+      const el = audioRef.current;
+      const located = chunks ? locateChunk(chunks, clamped) : null;
+      if (!el || !located) return;
+
+      if (loadedIndex.current !== located.chunk.index) {
+        loadedIndex.current = located.chunk.index;
+        pendingOffset.current = located.offsetSec;
+        el.src = located.chunk.url;
+        el.load();
+      } else if (el.readyState === 0) {
+        pendingOffset.current = located.offsetSec;
+      } else {
+        el.currentTime = located.offsetSec;
+      }
+
+      if (play) void el.play().catch(() => setPlaying(false));
+    },
+    [chunks, duration],
+  );
+
+  function toggle() {
+    const el = audioRef.current;
+    if (!el || !chunks?.length) return;
+    if (playing) {
+      el.pause();
+      return;
+    }
+    if (loadedIndex.current === null) seek(at, true);
+    else void el.play().catch(() => setPlaying(false));
+  }
+
+  function onLoadedMetadata() {
+    const el = audioRef.current;
+    if (!el || pendingOffset.current === null) return;
+    el.currentTime = pendingOffset.current;
+    pendingOffset.current = null;
+  }
+
+  function onTimeUpdate() {
+    const el = audioRef.current;
+    if (!el || !chunks) return;
+    const chunk = chunks.find((c) => c.index === loadedIndex.current);
+    if (chunk) setAt(chunk.startSec + el.currentTime);
+  }
+
+  /** Chunks overlap by 3s, so continuing at the *end* of the finished chunk lands
+   *  a few seconds into the next one -- no repeated audio, no gap. */
+  function onEnded() {
+    const chunk = chunks?.find((c) => c.index === loadedIndex.current);
+    const next = chunks?.find((c) => c.index === (loadedIndex.current ?? 0) + 1);
+    if (!chunk || !next) {
+      setPlaying(false);
+      return;
+    }
+    seek(chunk.startSec + chunk.durationSec, true);
+  }
+
+  const playable = (chunks?.length ?? 0) > 0;
 
   const byId = useMemo(
     () => Object.fromEntries(speakers.map((s) => [s.id, s])) as Record<string, Speaker>,
     [speakers],
   );
+
+  const activeId = useMemo(() => {
+    let current = segments[0]?.id;
+    for (const segment of segments) {
+      if (segment.at <= at + 0.25) current = segment.id;
+      else break;
+    }
+    return current;
+  }, [segments, at]);
 
   const matches = useMemo(() => {
     if (!query.trim()) return null;
@@ -80,7 +180,7 @@ export function TranscriptPanel({
       <ol className="flex flex-col">
         {segments.map((s) => {
           const dim = matches ? !matches.has(s.id) : false;
-          const here = s.at === at;
+          const here = s.id === activeId;
           return (
             <li
               key={s.id}
@@ -92,7 +192,7 @@ export function TranscriptPanel({
             >
               <button
                 type="button"
-                onClick={() => setAt(s.at)}
+                onClick={() => seek(s.at)}
                 className="shrink-0 font-mono text-xs tabular text-said-text hover:underline"
               >
                 {formatTimecode(s.at)}
@@ -109,23 +209,53 @@ export function TranscriptPanel({
 
       {audioAvailable ? (
         <div className="sticky bottom-0 flex items-center gap-3 rounded-lg border border-border bg-card/95 p-3 backdrop-blur-md">
+          <audio
+            ref={audioRef}
+            preload="none"
+            onLoadedMetadata={onLoadedMetadata}
+            onTimeUpdate={onTimeUpdate}
+            onEnded={onEnded}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+          />
           <button
             type="button"
-            onClick={() => setPlaying((p) => !p)}
+            onClick={toggle}
+            disabled={!playable}
             aria-label={playing ? "Pause" : "Play"}
-            className="inline-flex size-10 items-center justify-center rounded-full bg-done text-done-foreground"
+            className="inline-flex size-10 items-center justify-center rounded-full bg-done text-done-foreground disabled:opacity-50"
           >
             {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
           </button>
-          <button type="button" aria-label="Back 15 seconds" className="text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={() => seek(at - 15, playing)}
+            disabled={!playable}
+            aria-label="Back 15 seconds"
+            className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
             <RotateCcw className="size-4" />
           </button>
-          <button type="button" aria-label="Forward 15 seconds" className="text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={() => seek(at + 15, playing)}
+            disabled={!playable}
+            aria-label="Forward 15 seconds"
+            className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
             <RotateCw className="size-4" />
           </button>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div className="h-full bg-said" style={{ width: `${(at / duration) * 100}%` }} />
-          </div>
+          <input
+            type="range"
+            min={0}
+            max={Math.max(duration, 1)}
+            step={1}
+            value={Math.round(at)}
+            onChange={(e) => seek(Number(e.target.value), playing)}
+            disabled={!playable}
+            aria-label="Seek"
+            className="h-1.5 flex-1 accent-said disabled:opacity-50"
+          />
           <span className="font-mono text-xs tabular text-muted-foreground">
             {formatTimecode(at)} / {formatTimecode(duration)}
           </span>

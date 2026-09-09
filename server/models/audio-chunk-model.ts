@@ -149,3 +149,18 @@ export async function countDoneChunks(
   if (error) throw error;
   return count ?? 0;
 }
+
+/** Ordered chunks with everything playback needs: where each one starts in the
+ *  full recording and which object in Storage holds it. */
+export async function getPlayableChunksForMeeting(
+  supabase: SupabaseClient<Database>,
+  meetingId: string,
+): Promise<{ chunk_index: number; start_sec: number; duration_sec: number; storage_path: string }[]> {
+  const { data, error } = await supabase
+    .from("audio_chunks")
+    .select("chunk_index, start_sec, duration_sec, storage_path")
+    .eq("meeting_id", meetingId)
+    .order("chunk_index", { ascending: true });
+  if (error) throw error;
+  return data;
+}

@@ -26,14 +26,17 @@ export function PipelinePoller({
   meetingId,
   initialStatus,
   initialDetail,
+  initialErrorCode,
 }: {
   meetingId: string;
   initialStatus: MeetingStatus;
   initialDetail: string;
+  initialErrorCode?: string | null;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<MeetingStatus>(initialStatus);
   const [detail, setDetail] = useState(initialDetail);
+  const [errorCode, setErrorCode] = useState<string | null>(initialErrorCode ?? null);
   const [retrying, setRetrying] = useState(false);
   const advancing = useRef(false);
 
@@ -52,7 +55,8 @@ export function PipelinePoller({
       }
       const nextStatus = result.status as MeetingStatus;
       setStatus(nextStatus);
-      setDetail(result.stageDetail ?? statusCopy[nextStatus]?.hint);
+      setErrorCode(result.errorCode ?? null);
+      setDetail(result.stageDetail ?? result.error ?? statusCopy[nextStatus]?.hint);
     } finally {
       setRetrying(false);
     }
@@ -75,8 +79,13 @@ export function PipelinePoller({
         const result = await res.json();
         const nextStatus = result.status as MeetingStatus;
         setStatus(nextStatus);
+        setErrorCode(result.errorCode ?? null);
+        // `error` before the generic hint: a failed meeting carries the real
+        // reason here, and dropping it was why every failure read as "part of
+        // the audio did not come through" no matter what actually broke.
         setDetail(
           result.stageDetail ??
+            result.error ??
             (result.chunksTotal > 1
               ? `Transcribing chunk ${result.chunksDone} of ${result.chunksTotal}`
               : statusCopy[nextStatus]?.hint),
@@ -96,7 +105,7 @@ export function PipelinePoller({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <StatusStepper status={status} detail={detail} />
+      <StatusStepper status={status} detail={detail} errorCode={errorCode} />
       {status === "failed" && (
         <Button variant="outline" size="sm" onClick={retry} disabled={retrying}>
           {retrying ? "Retrying…" : "Try again"}

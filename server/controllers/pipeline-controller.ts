@@ -39,6 +39,9 @@ export interface PipelineStatus {
   chunksDone: number;
   chunksTotal: number;
   error: string | null;
+  /** Which failure this is, so the UI can point at the stage that actually broke
+   *  instead of always blaming transcription. Null unless status is "failed". */
+  errorCode: string | null;
 }
 
 /** Also the poll target's controller (GET /api/meetings/:id/status) -- same shape
@@ -56,6 +59,7 @@ export async function currentStatus(
     chunksDone,
     chunksTotal: meeting.chunk_count,
     error: meeting.error_message,
+    errorCode: meeting.error_code,
   };
 }
 
@@ -66,16 +70,18 @@ function quotaBlockedStatus(meeting: MeetingRow, resumeAt: string): PipelineStat
     chunksDone: meeting.chunk_count,
     chunksTotal: meeting.chunk_count,
     error: null,
+    errorCode: null,
   };
 }
 
-function failedStatus(meeting: MeetingRow, message: string): PipelineStatus {
+function failedStatus(meeting: MeetingRow, message: string, errorCode: string): PipelineStatus {
   return {
     status: "failed",
     stageDetail: null,
     chunksDone: meeting.chunk_count,
     chunksTotal: meeting.chunk_count,
     error: message,
+    errorCode,
   };
 }
 
@@ -128,6 +134,7 @@ export async function advance(
       chunksDone: meeting.chunk_count,
       chunksTotal: meeting.chunk_count,
       error: null,
+      errorCode: null,
     };
   }
 
@@ -143,6 +150,7 @@ export async function advance(
       chunksDone: 0,
       chunksTotal: meeting.chunk_count,
       error: null,
+      errorCode: null,
     };
   }
 
@@ -177,6 +185,7 @@ export async function advance(
         chunksDone: 0,
         chunksTotal: meeting.chunk_count,
         error: null,
+        errorCode: null,
       };
     }
 
@@ -184,6 +193,10 @@ export async function advance(
     // throwing (server/config/groq.ts), so any other error here is the
     // "after 3, mark the chunk failed" case, not a first failure to retry later.
     const message = err instanceof Error ? err.message : "Transcription failed.";
+    // The user-facing copy below deliberately says nothing technical, so log the
+    // real cause -- otherwise it only survives in audio_chunks.last_error and no
+    // one ever sees why a meeting actually stopped.
+    console.error("[pipeline] transcribe failed", { meetingId, chunkId: chunk.id }, err);
     await markChunkFailed(supabase, chunk.id, message);
     await markMeetingFailed(
       supabase,
@@ -197,6 +210,7 @@ export async function advance(
       chunksDone: 0,
       chunksTotal: meeting.chunk_count,
       error: "Part of the audio did not come through.",
+      errorCode: "TRANSCRIBE_FAILED",
     };
   }
 
@@ -328,15 +342,17 @@ async function runAnalysisStep(
     if (err instanceof AnalysisTooLongError) {
       const message = "This meeting is too long to analyze yet.";
       await markMeetingFailed(supabase, meeting.id, "ANALYZE_TOO_LONG", message);
-      return failedStatus(meeting, message);
+      return failedStatus(meeting, message, "ANALYZE_TOO_LONG");
     }
+
+    console.error("[pipeline] analysis failed", { meetingId: meeting.id }, err);
 
     // structured-output.ts already exhausted its own repair attempt before
     // throwing, so any other error here is the documented ANALYZE_INVALID_OUTPUT
     // case (docs/AI-PIPELINE.md section 5), not a first failure to retry later.
     const message = "Could not make sense of this meeting.";
     await markMeetingFailed(supabase, meeting.id, "ANALYZE_INVALID_OUTPUT", message);
-    return failedStatus(meeting, message);
+    return failedStatus(meeting, message, "ANALYZE_INVALID_OUTPUT");
   }
 
   return currentStatus(supabase, meeting.id);
@@ -361,9 +377,10 @@ async function runEmailStep(
       return quotaBlockedStatus(meeting, resumeAt);
     }
 
+    console.error("[pipeline] email draft failed", { meetingId: meeting.id }, err);
     const message = "Could not draft a follow-up email for this meeting.";
     await markMeetingFailed(supabase, meeting.id, "EMAIL_INVALID_OUTPUT", message);
-    return failedStatus(meeting, message);
+    return failedStatus(meeting, message, "EMAIL_INVALID_OUTPUT");
   }
 
   return currentStatus(supabase, meeting.id);
