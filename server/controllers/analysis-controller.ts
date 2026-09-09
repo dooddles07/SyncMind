@@ -16,7 +16,9 @@ import { QuotaBlockedError } from "@/server/utils/pipeline-errors";
 import { runStructuredAndValidate } from "@/server/utils/structured-output";
 import { isNearDuplicate } from "@/server/utils/text-similarity";
 
-const ANALYSIS_MODEL = "llama-3.3-70b-versatile";
+// Recorded on the summaries row for provenance only -- the actual Groq call goes
+// through server/config/groq.ts's own ANALYSIS_MODEL, which this must match.
+const ANALYSIS_MODEL = "openai/gpt-oss-120b";
 const SINGLE_PASS_SAFE_TOKENS = 5000;
 const CHARS_PER_TOKEN = 4;
 const ESTIMATED_OUTPUT_TOKENS = 2500;

@@ -4,6 +4,43 @@ Running record of decisions and work. Newest first. Not auto-committed.
 
 ---
 
+## 2026-09-09 — Analysis model swap: llama-3.3-70b-versatile decommissioned on Groq
+
+Real meeting stuck at "Picked apart" with the generic `ANALYZE_INVALID_OUTPUT`
+message. Vercel runtime error logs (fetched via the Vercel MCP, not guessed)
+showed the real cause: Groq 404 `model_not_found` for
+`llama-3.3-70b-versatile` -- decommissioned upstream, not a content/schema
+problem. Two bugs, fixed together:
+
+- `runAnalysisStep`/`runEmailStep` conflated "Groq API call itself failed"
+  with "model produced invalid JSON after repair" -- both landed on the same
+  `*_INVALID_OUTPUT` code and message, so a real infra failure looked like
+  unfixable junk input. Split: only `StructuredOutputError` (thrown after
+  `structured-output.ts` exhausts its repair attempt on a real response) gets
+  `ANALYZE_INVALID_OUTPUT`/`EMAIL_INVALID_OUTPUT`; everything else gets a new
+  `ANALYZE_UNAVAILABLE`/`EMAIL_UNAVAILABLE` with an honest "could not reach
+  the AI model" message.
+- Swapped `ANALYSIS_MODEL` in `server/config/groq.ts` (the real call site)
+  and `server/controllers/analysis-controller.ts` (the provenance value
+  stored on `summaries.model`) to `openai/gpt-oss-120b` -- confirmed current
+  and `json_object`-mode-capable via Groq's own docs before switching, not
+  assumed from training data. `whisper-large-v3-turbo` and
+  `llama-3.1-8b-instant` (ask) both confirmed still supported, left alone.
+
+Also fixed in the same pass, found while chasing this: the transcript
+player had no `<audio>` element at all (new `GET /api/meetings/[id]/audio`
+signs per-chunk URLs; `lib/audio/playlist.ts` maps a timeline position to a
+chunk + offset), and the status stepper hardcoded every failure onto
+"Written down" regardless of which stage actually broke (`PipelineStatus`
+now carries `errorCode`; `failedStageIndex` in `lib/types.ts` maps it to the
+right stage).
+
+Docs not yet swept for the old model name (`docs/AI-PIPELINE.md`,
+`docs/DEPLOYMENT.md`, `docs/GAP-ANALYSIS.md`, `README.md`, `.env.example`)
+-- functionally inert, but worth a pass.
+
+---
+
 ## 2026-07-29 — GitHub repo secrets added, E2E confirmed green in real CI, cron-job.org pinger live
 
 **Done, three small closing items:**

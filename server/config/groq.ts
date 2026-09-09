@@ -11,7 +11,11 @@ import type { WhisperSegment } from "@/server/utils/transcript-stitch";
 const GROQ_BASE_URL = process.env.GROQ_BASE_URL ?? "https://api.groq.com";
 
 const WHISPER_MODEL = "whisper-large-v3-turbo";
-const ANALYSIS_MODEL = "llama-3.3-70b-versatile";
+// llama-3.3-70b-versatile was decommissioned on Groq (404 model_not_found,
+// confirmed via runtime error logs) -- gpt-oss-120b is Groq's current
+// replacement at the same tier: supports response_format json_object (what
+// runStructuredCompletion sends below) and a comparable context window.
+const ANALYSIS_MODEL = "openai/gpt-oss-120b";
 export const ASK_MODEL = "llama-3.1-8b-instant";
 const RETRY_BACKOFF_MS = [2000, 6000, 18000];
 
