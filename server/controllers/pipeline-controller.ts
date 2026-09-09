@@ -31,6 +31,7 @@ import {
 } from "@/server/models/transcript-model";
 import { HttpError } from "@/server/utils/http-error";
 import { QuotaBlockedError } from "@/server/utils/pipeline-errors";
+import { StructuredOutputError } from "@/server/utils/structured-output";
 import { shiftAndDedupe } from "@/server/utils/transcript-stitch";
 
 export interface PipelineStatus {
@@ -240,7 +241,8 @@ export class RetryNotAllowedError extends Error {
  * "failed" is otherwise invisible to the transcribing loop -- flipping
  * meeting.status back to "transcribing" without resetting it would silently
  * skip straight to "analyzing" with a chunk missing. Every other failure
- * mode (ANALYZE_TOO_LONG, ANALYZE_INVALID_OUTPUT, EMAIL_INVALID_OUTPUT) can
+ * mode (ANALYZE_TOO_LONG, ANALYZE_INVALID_OUTPUT, ANALYZE_UNAVAILABLE,
+ * EMAIL_INVALID_OUTPUT, EMAIL_UNAVAILABLE) can
  * just resume at "analyzing" -- advanceAnalysis already re-derives which
  * sub-step to redo from real summary/email-draft rows.
  */
@@ -347,12 +349,21 @@ async function runAnalysisStep(
 
     console.error("[pipeline] analysis failed", { meetingId: meeting.id }, err);
 
-    // structured-output.ts already exhausted its own repair attempt before
-    // throwing, so any other error here is the documented ANALYZE_INVALID_OUTPUT
-    // case (docs/AI-PIPELINE.md section 5), not a first failure to retry later.
-    const message = "Could not make sense of this meeting.";
-    await markMeetingFailed(supabase, meeting.id, "ANALYZE_INVALID_OUTPUT", message);
-    return failedStatus(meeting, message, "ANALYZE_INVALID_OUTPUT");
+    // Only StructuredOutputError means structured-output.ts actually reached and
+    // exhausted its repair attempt on a real model response -- that's the
+    // documented ANALYZE_INVALID_OUTPUT case (docs/AI-PIPELINE.md section 5).
+    // Anything else (GroqApiError: bad key, bad/decommissioned model id,
+    // malformed request, 5xx after retries) never got that far and is a service
+    // problem, not a content one -- mislabeling it "could not make sense of this
+    // meeting" hid the real cause and made it look unfixable.
+    if (err instanceof StructuredOutputError) {
+      const message = "Could not make sense of this meeting.";
+      await markMeetingFailed(supabase, meeting.id, "ANALYZE_INVALID_OUTPUT", message);
+      return failedStatus(meeting, message, "ANALYZE_INVALID_OUTPUT");
+    }
+    const message = "Could not reach the AI model to analyze this meeting.";
+    await markMeetingFailed(supabase, meeting.id, "ANALYZE_UNAVAILABLE", message);
+    return failedStatus(meeting, message, "ANALYZE_UNAVAILABLE");
   }
 
   return currentStatus(supabase, meeting.id);
@@ -378,9 +389,18 @@ async function runEmailStep(
     }
 
     console.error("[pipeline] email draft failed", { meetingId: meeting.id }, err);
-    const message = "Could not draft a follow-up email for this meeting.";
-    await markMeetingFailed(supabase, meeting.id, "EMAIL_INVALID_OUTPUT", message);
-    return failedStatus(meeting, message, "EMAIL_INVALID_OUTPUT");
+
+    // Same split as runAnalysisStep above: StructuredOutputError only after a
+    // real repair attempt on a real response; anything else is a service
+    // problem, not a content one.
+    if (err instanceof StructuredOutputError) {
+      const message = "Could not draft a follow-up email for this meeting.";
+      await markMeetingFailed(supabase, meeting.id, "EMAIL_INVALID_OUTPUT", message);
+      return failedStatus(meeting, message, "EMAIL_INVALID_OUTPUT");
+    }
+    const message = "Could not reach the AI model to draft the follow-up email.";
+    await markMeetingFailed(supabase, meeting.id, "EMAIL_UNAVAILABLE", message);
+    return failedStatus(meeting, message, "EMAIL_UNAVAILABLE");
   }
 
   return currentStatus(supabase, meeting.id);

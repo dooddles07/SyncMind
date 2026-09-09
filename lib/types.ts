@@ -148,7 +148,9 @@ export function failedStageIndex(errorCode?: string | null): number {
       return 1;
     case "ANALYZE_TOO_LONG":
     case "ANALYZE_INVALID_OUTPUT":
+    case "ANALYZE_UNAVAILABLE":
     case "EMAIL_INVALID_OUTPUT":
+    case "EMAIL_UNAVAILABLE":
       return 2;
     default:
       return 1;
